@@ -15,7 +15,6 @@
 | :--- | :--- |
 | **Ikker Mateo Gil Jordán** | Arquitectura DAG, Motor Pseudo-3D, Física Q11.4 y QA Automatizado |
 | **Juan Fernando Gómez** | Integración de Sistemas, Validación Funcional y Sustentación |
-| *[Espacio editable para integrantes adicionales]* | *[Rol opcional]* |
 
 ---
 
