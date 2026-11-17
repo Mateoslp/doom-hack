@@ -54,8 +54,10 @@
 
     .deck-canvas {
       position: relative;
-      width: min(100vw, calc(100vh * 16 / 9));
-      height: min(100vh, calc(100vw * 9 / 16));
+      width: 1280px;
+      height: 720px;
+      flex-shrink: 0;
+      transform-origin: center center;
       overflow: hidden;
       box-shadow: 0 25px 70px rgba(0, 0, 0, 0.75);
       background-color: var(--bg-light);
@@ -128,6 +130,8 @@
       font-weight: 700;
       letter-spacing: 0.02em;
       border-radius: 6px;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     /* Campos editables discretos para personalizar nombres/links antes de exponer */
@@ -143,18 +147,20 @@
       background: rgba(0, 180, 216, 0.08);
     }
 
-    /* Barra flotante de controles */
+    /* Barra flotante de controles centrada en la zona libre del pie */
     .controls-hud {
       position: fixed;
-      bottom: 14px;
-      right: 18px;
+      bottom: 8px;
+      left: 50%;
+      right: auto;
+      transform: translateX(-50%);
       z-index: 100;
       display: flex;
       align-items: center;
       gap: 6px;
-      padding: 6px 10px;
+      padding: 5px 10px;
       border-radius: 9999px;
-      background: rgba(15, 23, 42, 0.82);
+      background: rgba(15, 23, 42, 0.86);
       backdrop-filter: blur(10px);
       border: 1px solid rgba(148, 163, 184, 0.25);
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
@@ -199,6 +205,7 @@
       .deck-canvas {
         width: 16in !important;
         height: auto !important;
+        transform: none !important;
         overflow: visible !important;
         box-shadow: none !important;
       }
@@ -238,7 +245,7 @@
       <!-- =================================================================== -->
       <!-- DIAPOSITIVA 1: PORTADA (DARK MODE)                                  -->
       <!-- =================================================================== -->
-      <section class="slide active dark-grid-bg px-12 py-8 text-white" data-slide="1">
+      <section class="slide active dark-grid-bg px-12 pt-7 pb-11 text-white" data-slide="1">
         <!-- Encabezado institucional -->
         <header class="flex items-center justify-between">
           <div class="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-[#00B4D8]/12 border border-[#00B4D8]/40 text-[#00B4D8] text-xs font-bold tracking-wider uppercase">
@@ -264,7 +271,7 @@
               <span class="h-px flex-1 bg-gradient-to-r from-[#D4A017]/60 to-transparent"></span>
             </div>
 
-            <h1 class="text-5xl xl:text-6xl font-black tracking-tight leading-none text-white">
+            <h1 class="text-5xl font-black tracking-tight leading-none text-white">
               DOOM <span class="text-[#00B4D8]">//</span> HELLGATE 16
             </h1>
             <p class="mt-2 text-lg font-semibold tracking-wide text-slate-300 uppercase">
@@ -380,22 +387,22 @@
         </div>
 
         <!-- Pie de portada con integrantes y metadatos -->
-        <footer class="grid grid-cols-12 gap-4 pt-3 border-t border-slate-800/90 items-center text-xs">
-          <div class="col-span-6 accent-card-dark px-4 py-2.5 flex items-center justify-between">
+        <footer class="grid grid-cols-12 gap-4 pt-2.5 border-t border-slate-800/90 items-center text-xs">
+          <div class="col-span-6 accent-card-dark px-4 py-2 flex items-center justify-between">
             <div>
               <span class="text-[10px] font-bold uppercase tracking-wider text-[#00B4D8]">Equipo de Desarrollo (clic para editar)</span>
               <div class="text-sm font-semibold text-white mt-0.5" contenteditable="true" spellcheck="false">
-                Mateo Jiménez &bull; Equipo Grupo 1 &mdash; Ingeniería de Sistemas
+                Ikker Mateo Gil Jordán &bull; Juan Fernando Gómez &mdash; Grupo 1
               </div>
             </div>
           </div>
 
-          <div class="col-span-3 bg-[#1A1E26] border border-[#2A313D] rounded-xl px-4 py-2.5">
+          <div class="col-span-3 bg-[#1A1E26] border border-[#2A313D] rounded-xl px-4 py-2">
             <span class="text-[10px] font-bold uppercase tracking-wider text-[#D4A017]">Curso</span>
             <div class="text-sm font-semibold text-white mt-0.5">Organización de Computadores</div>
           </div>
 
-          <div class="col-span-3 bg-[#1A1E26] border border-[#2A313D] rounded-xl px-4 py-2.5">
+          <div class="col-span-3 bg-[#1A1E26] border border-[#2A313D] rounded-xl px-4 py-2">
             <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Sustentación &amp; Duración</span>
             <div class="text-sm font-semibold text-white mt-0.5">16 Noviembre 2026 &bull; 8 Min</div>
           </div>
@@ -728,15 +735,15 @@
       <!-- =================================================================== -->
       <!-- DIAPOSITIVA 4: ARQUITECTURA DEL SISTEMA (DIAGRAMA DE BLOQUES SVG)   -->
       <!-- =================================================================== -->
-      <section class="slide light-clean-bg px-12 py-6 text-slate-900" data-slide="4">
-        <header class="flex items-start justify-between">
+      <section class="slide light-clean-bg px-12 pt-6 pb-8 text-slate-900" data-slide="4">
+        <header class="flex items-start justify-between gap-4">
           <div>
             <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#0284C7]">
               <span>03 &bull; Arquitectura de Software</span>
               <span class="text-slate-300">|</span>
               <span class="text-slate-500">Grafo Acíclico Dirigido en 6 Capas (16 Clases)</span>
             </div>
-            <h2 class="text-3xl font-extrabold tracking-tight text-slate-900 mt-0.5">
+            <h2 class="text-2xl font-extrabold tracking-tight text-slate-900 mt-0.5">
               Diagrama de Bloques y Flujo de Control Unidireccional
             </h2>
           </div>
@@ -745,9 +752,9 @@
           </div>
         </header>
 
-        <!-- Diagrama de bloques SVG maestro por capas -->
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 my-auto">
-          <svg viewBox="0 0 1120 405" class="w-full h-auto">
+        <!-- Diagrama de bloques SVG maestro por capas (sin solapamientos) -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-2.5 my-auto">
+          <svg viewBox="0 0 1120 392" class="w-full h-auto">
             <defs>
               <marker id="arrBlue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
                 <path d="M 0 1 L 10 5 L 0 9 z" fill="#0284C7"/>
@@ -760,155 +767,164 @@
               </marker>
             </defs>
 
-            <!-- Bandas horizontales de flujo por columna/capa -->
-            <!-- Columna 1: Entrada & Config -->
-            <rect x="10" y="10" width="185" height="318" rx="12" fill="#F1F5F9" stroke="#CBD5E1"/>
-            <text x="102" y="30" text-anchor="middle" font-size="11" font-weight="800" fill="#0284C7">1. CAPA ENTRADA &amp; BASE</text>
+            <!-- Columna 1: Entrada & Base (x=10..195, y=38..324) -->
+            <rect x="10" y="38" width="185" height="286" rx="12" fill="#F1F5F9" stroke="#CBD5E1"/>
+            <text x="102" y="57" text-anchor="middle" font-size="11" font-weight="800" fill="#0284C7">1. CAPA ENTRADA &amp; BASE</text>
 
-            <rect x="26" y="46" width="153" height="58" rx="8" fill="#FFFFFF" stroke="#0284C7" stroke-width="2"/>
-            <text x="102" y="70" text-anchor="middle" font-size="13" font-weight="800" fill="#0F172A">InputManager</text>
-            <text x="102" y="88" text-anchor="middle" font-size="10" fill="#475569">Sondeo no bloqueante + flancos</text>
+            <rect x="26" y="68" width="153" height="52" rx="8" fill="#FFFFFF" stroke="#0284C7" stroke-width="2"/>
+            <text x="102" y="90" text-anchor="middle" font-size="13" font-weight="800" fill="#0F172A">InputManager</text>
+            <text x="102" y="107" text-anchor="middle" font-size="9.5" fill="#475569">Sondeo no bloqueante + flancos</text>
 
-            <rect x="26" y="122" width="153" height="54" rx="8" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.5"/>
-            <text x="102" y="145" text-anchor="middle" font-size="13" font-weight="800" fill="#0F172A">ScoreManager</text>
-            <text x="102" y="162" text-anchor="middle" font-size="10" fill="#475569">Puntaje, récord y oleadas</text>
+            <rect x="26" y="132" width="153" height="52" rx="8" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.5"/>
+            <text x="102" y="154" text-anchor="middle" font-size="13" font-weight="800" fill="#0F172A">ScoreManager</text>
+            <text x="102" y="170" text-anchor="middle" font-size="9.5" fill="#475569">Puntaje, récord y oleadas</text>
 
-            <rect x="26" y="194" width="153" height="54" rx="8" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.5"/>
-            <text x="102" y="217" text-anchor="middle" font-size="13" font-weight="800" fill="#0F172A">MathUtils</text>
-            <text x="102" y="234" text-anchor="middle" font-size="10" fill="#475569">Q11.4 y proyección 1/z</text>
+            <rect x="26" y="196" width="153" height="52" rx="8" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.5"/>
+            <text x="102" y="218" text-anchor="middle" font-size="13" font-weight="800" fill="#0F172A">MathUtils</text>
+            <text x="102" y="234" text-anchor="middle" font-size="9.5" fill="#475569">Q11.4 y proyección 1/z</text>
 
-            <rect x="26" y="264" width="153" height="50" rx="8" fill="#E2E8F0" stroke="#94A3B8"/>
-            <text x="102" y="285" text-anchor="middle" font-size="11.5" font-weight="800" fill="#1E293B">GameConstants / GameState</text>
-            <text x="102" y="302" text-anchor="middle" font-size="9.5" fill="#475569">Capa 0 Estática Pura</text>
+            <rect x="26" y="260" width="153" height="50" rx="8" fill="#E2E8F0" stroke="#94A3B8"/>
+            <text x="102" y="281" text-anchor="middle" font-size="11" font-weight="800" fill="#1E293B">GameConstants / GameState</text>
+            <text x="102" y="298" text-anchor="middle" font-size="9.5" fill="#475569">Capa 0 Estática Pura</text>
 
-            <!-- Columna 2: Orquestacion -->
-            <rect x="225" y="10" width="210" height="318" rx="12" fill="#0F172A"/>
-            <text x="330" y="30" text-anchor="middle" font-size="11" font-weight="800" fill="#00B4D8">2. LÓGICA / GAME LOOP</text>
+            <!-- Columna 2: Orquestacion (x=232..440, y=38..324) -->
+            <rect x="232" y="38" width="208" height="286" rx="12" fill="#0F172A"/>
+            <text x="336" y="57" text-anchor="middle" font-size="11" font-weight="800" fill="#00B4D8">2. LÓGICA / GAME LOOP</text>
 
-            <rect x="255" y="44" width="150" height="44" rx="8" fill="#1E293B" stroke="#D4A017" stroke-width="1.8"/>
-            <text x="330" y="64" text-anchor="middle" font-size="13" font-weight="800" fill="#FFFFFF">Main</text>
-            <text x="330" y="79" text-anchor="middle" font-size="10" fill="#FDE68A">Punto de entrada raíz</text>
+            <rect x="260" y="68" width="152" height="42" rx="8" fill="#1E293B" stroke="#D4A017" stroke-width="1.8"/>
+            <text x="336" y="86" text-anchor="middle" font-size="13" font-weight="800" fill="#FFFFFF">Main</text>
+            <text x="336" y="101" text-anchor="middle" font-size="9.5" fill="#FDE68A">Punto de entrada raíz</text>
 
-            <line x1="330" y1="88" x2="330" y2="112" stroke="#D4A017" stroke-width="2" marker-end="url(#arrGold)"/>
+            <line x1="336" y1="110" x2="336" y2="128" stroke="#D4A017" stroke-width="2" marker-end="url(#arrGold)"/>
 
-            <rect x="242" y="114" width="176" height="106" rx="10" fill="#1E293B" stroke="#00B4D8" stroke-width="2.5"/>
-            <text x="330" y="140" text-anchor="middle" font-size="16" font-weight="900" fill="#00B4D8">DoomGame</text>
-            <text x="330" y="159" text-anchor="middle" font-size="10.5" font-weight="600" fill="#E2E8F0">Orquestador en 8 Fases</text>
-            <rect x="256" y="170" width="148" height="38" rx="6" fill="#0B0F17" stroke="#334155"/>
-            <text x="330" y="186" text-anchor="middle" font-size="9.5" font-weight="700" fill="#38BDF8">MENU &harr; PLAYING</text>
-            <text x="330" y="201" text-anchor="middle" font-size="9.5" font-weight="700" fill="#F59E0B">PAUSED &harr; GAME OVER</text>
+            <rect x="248" y="131" width="176" height="98" rx="10" fill="#1E293B" stroke="#00B4D8" stroke-width="2.5"/>
+            <text x="336" y="155" text-anchor="middle" font-size="15.5" font-weight="900" fill="#00B4D8">DoomGame</text>
+            <text x="336" y="172" text-anchor="middle" font-size="10" font-weight="600" fill="#E2E8F0">Orquestador en 8 Fases</text>
+            <rect x="262" y="182" width="148" height="36" rx="6" fill="#0B0F17" stroke="#334155"/>
+            <text x="336" y="197" text-anchor="middle" font-size="9" font-weight="700" fill="#38BDF8">MENU &harr; PLAYING</text>
+            <text x="336" y="211" text-anchor="middle" font-size="9" font-weight="700" fill="#F59E0B">PAUSED &harr; GAME OVER</text>
 
-            <rect x="242" y="242" width="176" height="72" rx="8" fill="#1E293B" stroke="#475569"/>
-            <text x="330" y="264" text-anchor="middle" font-size="13" font-weight="800" fill="#FFFFFF">Player</text>
-            <text x="330" y="281" text-anchor="middle" font-size="10" fill="#CBD5E1">Posición, mira, salud y munición</text>
-            <text x="330" y="297" text-anchor="middle" font-size="9.5" font-weight="700" fill="#38BDF8">Temporizadores cada ciclo</text>
+            <rect x="248" y="246" width="176" height="64" rx="8" fill="#1E293B" stroke="#475569"/>
+            <text x="336" y="267" text-anchor="middle" font-size="13" font-weight="800" fill="#FFFFFF">Player</text>
+            <text x="336" y="283" text-anchor="middle" font-size="9.5" fill="#CBD5E1">Posición, mira, salud y munición</text>
+            <text x="336" y="298" text-anchor="middle" font-size="9" font-weight="700" fill="#38BDF8">Temporizadores cada ciclo</text>
 
-            <line x1="330" y1="220" x2="330" y2="239" stroke="#00B4D8" stroke-width="2" marker-end="url(#arrBlue)"/>
+            <line x1="336" y1="229" x2="336" y2="244" stroke="#00B4D8" stroke-width="2" marker-end="url(#arrBlue)"/>
 
-            <!-- Columna 3: Motores de Simulacion, IA y Pools -->
-            <rect x="465" y="10" width="315" height="318" rx="12" fill="#F1F5F9" stroke="#CBD5E1"/>
-            <text x="622" y="30" text-anchor="middle" font-size="11" font-weight="800" fill="#0284C7">3. MOTORES FÍSICA, IA Y POOLS</text>
+            <!-- Columna 3: Motores de Simulacion, IA y Pools (x=470..784, y=38..324) -->
+            <rect x="470" y="38" width="314" height="286" rx="12" fill="#F1F5F9" stroke="#CBD5E1"/>
+            <text x="627" y="57" text-anchor="middle" font-size="11" font-weight="800" fill="#0284C7">3. MOTORES FÍSICA, IA Y POOLS</text>
 
-            <rect x="485" y="48" width="275" height="58" rx="8" fill="#FFFFFF" stroke="#0284C7" stroke-width="2"/>
-            <text x="622" y="71" text-anchor="middle" font-size="14" font-weight="800" fill="#0F172A">CollisionManager</text>
-            <text x="622" y="89" text-anchor="middle" font-size="10.5" fill="#475569">Disparo con oclusión Z, cuerpo a cuerpo e impactos</text>
+            <rect x="488" y="68" width="278" height="54" rx="8" fill="#FFFFFF" stroke="#0284C7" stroke-width="2"/>
+            <text x="627" y="90" text-anchor="middle" font-size="13.5" font-weight="800" fill="#0F172A">CollisionManager</text>
+            <text x="627" y="108" text-anchor="middle" font-size="10" fill="#475569">Disparo con oclusión Z, cuerpo a cuerpo e impactos</text>
 
-            <rect x="485" y="128" width="160" height="72" rx="8" fill="#FFFFFF" stroke="#0284C7" stroke-width="2"/>
-            <text x="565" y="153" text-anchor="middle" font-size="13.5" font-weight="800" fill="#0F172A">EntityManager</text>
-            <text x="565" y="170" text-anchor="middle" font-size="10" fill="#475569">Pools fijos y spawner</text>
-            <text x="565" y="185" text-anchor="middle" font-size="9.5" font-weight="700" fill="#0284C7">4 Enemigos | 5 Orbes</text>
+            <rect x="488" y="140" width="162" height="68" rx="8" fill="#FFFFFF" stroke="#0284C7" stroke-width="2"/>
+            <text x="569" y="163" text-anchor="middle" font-size="13" font-weight="800" fill="#0F172A">EntityManager</text>
+            <text x="569" y="179" text-anchor="middle" font-size="9.5" fill="#475569">Pools fijos y spawner</text>
+            <text x="569" y="195" text-anchor="middle" font-size="9" font-weight="700" fill="#0284C7">4 Enemigos | 5 Orbes</text>
 
-            <rect x="658" y="128" width="102" height="72" rx="8" fill="#FEF3C7" stroke="#D4A017" stroke-width="2"/>
-            <text x="709" y="152" text-anchor="middle" font-size="12" font-weight="800" fill="#92400E">Physics</text>
-            <text x="709" y="167" text-anchor="middle" font-size="12" font-weight="800" fill="#92400E">Engine</text>
-            <text x="709" y="185" text-anchor="middle" font-size="9.5" font-weight="700" fill="#B45309">Gravedad + 7/8</text>
+            <rect x="664" y="140" width="102" height="68" rx="8" fill="#FEF3C7" stroke="#D4A017" stroke-width="2"/>
+            <text x="715" y="162" text-anchor="middle" font-size="11.5" font-weight="800" fill="#92400E">Physics</text>
+            <text x="715" y="177" text-anchor="middle" font-size="11.5" font-weight="800" fill="#92400E">Engine</text>
+            <text x="715" y="195" text-anchor="middle" font-size="9" font-weight="700" fill="#B45309">Gravedad + 7/8</text>
 
-            <rect x="485" y="232" width="130" height="72" rx="8" fill="#FFFFFF" stroke="#64748B" stroke-width="1.6"/>
-            <text x="550" y="255" text-anchor="middle" font-size="13" font-weight="800" fill="#0F172A">Enemy</text>
-            <text x="550" y="272" text-anchor="middle" font-size="10" fill="#475569">Acechador y Bruto</text>
-            <text x="550" y="288" text-anchor="middle" font-size="9.5" fill="#0284C7">IA avance y rebote X</text>
+            <rect x="488" y="236" width="132" height="72" rx="8" fill="#FFFFFF" stroke="#64748B" stroke-width="1.6"/>
+            <text x="554" y="259" text-anchor="middle" font-size="13" font-weight="800" fill="#0F172A">Enemy</text>
+            <text x="554" y="276" text-anchor="middle" font-size="9.5" fill="#475569">Acechador y Bruto</text>
+            <text x="554" y="293" text-anchor="middle" font-size="9" fill="#0284C7">IA avance y rebote X</text>
 
-            <rect x="630" y="232" width="130" height="72" rx="8" fill="#FFFFFF" stroke="#64748B" stroke-width="1.6"/>
-            <text x="695" y="255" text-anchor="middle" font-size="13" font-weight="800" fill="#0F172A">Projectile</text>
-            <text x="695" y="272" text-anchor="middle" font-size="10" fill="#475569">Orbe balístico Q11.4</text>
-            <text x="695" y="288" text-anchor="middle" font-size="9.5" fill="#D4A017">Sin floats</text>
+            <rect x="634" y="236" width="132" height="72" rx="8" fill="#FFFFFF" stroke="#64748B" stroke-width="1.6"/>
+            <text x="700" y="259" text-anchor="middle" font-size="13" font-weight="800" fill="#0F172A">Projectile</text>
+            <text x="700" y="276" text-anchor="middle" font-size="9.5" fill="#475569">Orbe balístico Q11.4</text>
+            <text x="700" y="293" text-anchor="middle" font-size="9" fill="#D4A017">Sin floats</text>
 
-            <line x1="645" y1="164" x2="656" y2="164" stroke="#D4A017" stroke-width="2" marker-end="url(#arrGold)"/>
-            <line x1="550" y1="200" x2="550" y2="229" stroke="#475569" stroke-width="1.8" marker-end="url(#arrSlate)"/>
-            <line x1="709" y1="200" x2="709" y2="229" stroke="#D4A017" stroke-width="1.8" marker-end="url(#arrGold)"/>
-            <line x1="565" y1="106" x2="565" y2="125" stroke="#0284C7" stroke-width="1.8" marker-end="url(#arrBlue)"/>
+            <line x1="650" y1="174" x2="662" y2="174" stroke="#D4A017" stroke-width="2" marker-end="url(#arrGold)"/>
+            <line x1="554" y1="208" x2="554" y2="233" stroke="#475569" stroke-width="1.8" marker-end="url(#arrSlate)"/>
+            <line x1="715" y1="208" x2="715" y2="233" stroke="#D4A017" stroke-width="1.8" marker-end="url(#arrGold)"/>
+            <line x1="569" y1="122" x2="569" y2="137" stroke="#0284C7" stroke-width="1.8" marker-end="url(#arrBlue)"/>
 
-            <!-- Columna 4: Renderizado y HUD -->
-            <rect x="810" y="10" width="300" height="318" rx="12" fill="#F1F5F9" stroke="#CBD5E1"/>
-            <text x="960" y="30" text-anchor="middle" font-size="11" font-weight="800" fill="#0284C7">4. RENDERIZADO Y HUD</text>
+            <!-- Columna 4: Renderizado y HUD (x=812..1110, y=38..324) -->
+            <rect x="812" y="38" width="298" height="286" rx="12" fill="#F1F5F9" stroke="#CBD5E1"/>
+            <text x="961" y="57" text-anchor="middle" font-size="11" font-weight="800" fill="#0284C7">4. RENDERIZADO Y HUD</text>
 
-            <rect x="830" y="54" width="260" height="74" rx="8" fill="#FFFFFF" stroke="#0284C7" stroke-width="2.2"/>
-            <text x="960" y="79" text-anchor="middle" font-size="15" font-weight="800" fill="#0F172A">Renderer</text>
-            <text x="960" y="97" text-anchor="middle" font-size="10.5" fill="#475569">Algoritmo pintor back-to-front por z</text>
-            <text x="960" y="114" text-anchor="middle" font-size="9.5" font-weight="700" fill="#0284C7">Mira, arma y ordenación sin memoria extra</text>
+            <rect x="832" y="68" width="258" height="68" rx="8" fill="#FFFFFF" stroke="#0284C7" stroke-width="2.2"/>
+            <text x="961" y="90" text-anchor="middle" font-size="14.5" font-weight="800" fill="#0F172A">Renderer</text>
+            <text x="961" y="107" text-anchor="middle" font-size="10" fill="#475569">Algoritmo pintor back-to-front por z</text>
+            <text x="961" y="123" text-anchor="middle" font-size="9.5" font-weight="700" fill="#0284C7">Mira, arma y ordenación estática</text>
 
-            <rect x="830" y="152" width="124" height="148" rx="8" fill="#FFFFFF" stroke="#64748B" stroke-width="1.8"/>
-            <text x="892" y="184" text-anchor="middle" font-size="12.5" font-weight="800" fill="#0F172A">World</text>
-            <text x="892" y="200" text-anchor="middle" font-size="12.5" font-weight="800" fill="#0F172A">Renderer</text>
-            <text x="892" y="224" text-anchor="middle" font-size="9.5" fill="#475569">Túnel móvil 2.5D</text>
-            <text x="892" y="242" text-anchor="middle" font-size="9.5" font-weight="700" fill="#0284C7">Clipping estricto</text>
-            <text x="892" y="258" text-anchor="middle" font-size="9.5" font-weight="700" fill="#0284C7">[0..511]&times;[0..206]</text>
+            <rect x="832" y="160" width="122" height="148" rx="8" fill="#FFFFFF" stroke="#64748B" stroke-width="1.8"/>
+            <text x="893" y="194" text-anchor="middle" font-size="12.5" font-weight="800" fill="#0F172A">World</text>
+            <text x="893" y="210" text-anchor="middle" font-size="12.5" font-weight="800" fill="#0F172A">Renderer</text>
+            <text x="893" y="234" text-anchor="middle" font-size="9.5" fill="#475569">Túnel móvil 2.5D</text>
+            <text x="893" y="252" text-anchor="middle" font-size="9.5" font-weight="700" fill="#0284C7">Clipping estricto</text>
+            <text x="893" y="268" text-anchor="middle" font-size="9.5" font-weight="700" fill="#0284C7">[0..511]&times;[0..206]</text>
 
-            <rect x="966" y="152" width="124" height="148" rx="8" fill="#FFFFFF" stroke="#D4A017" stroke-width="1.8"/>
-            <text x="1028" y="188" text-anchor="middle" font-size="14" font-weight="800" fill="#0F172A">HUD</text>
-            <text x="1028" y="212" text-anchor="middle" font-size="9.5" fill="#475569">Banda inferior fija</text>
-            <text x="1028" y="229" text-anchor="middle" font-size="9.5" fill="#475569">17 textos fijos</text>
-            <text x="1028" y="248" text-anchor="middle" font-size="9.5" font-weight="700" fill="#B45309">Redibujo por</text>
-            <text x="1028" y="262" text-anchor="middle" font-size="9.5" font-weight="700" fill="#B45309">bandera isDirty</text>
+            <rect x="968" y="160" width="122" height="148" rx="8" fill="#FFFFFF" stroke="#D4A017" stroke-width="1.8"/>
+            <text x="1029" y="198" text-anchor="middle" font-size="14" font-weight="800" fill="#0F172A">HUD</text>
+            <text x="1029" y="222" text-anchor="middle" font-size="9.5" fill="#475569">Banda inferior fija</text>
+            <text x="1029" y="239" text-anchor="middle" font-size="9.5" fill="#475569">17 textos fijos</text>
+            <text x="1029" y="258" text-anchor="middle" font-size="9.5" font-weight="700" fill="#B45309">Redibujo por</text>
+            <text x="1029" y="272" text-anchor="middle" font-size="9.5" font-weight="700" fill="#B45309">bandera isDirty</text>
 
-            <line x1="892" y1="128" x2="892" y2="149" stroke="#0284C7" stroke-width="2" marker-end="url(#arrBlue)"/>
-            <line x1="1028" y1="128" x2="1028" y2="149" stroke="#D4A017" stroke-width="2" marker-end="url(#arrGold)"/>
+            <line x1="893" y1="136" x2="893" y2="157" stroke="#0284C7" stroke-width="2" marker-end="url(#arrBlue)"/>
+            <line x1="1029" y1="136" x2="1029" y2="157" stroke="#D4A017" stroke-width="2" marker-end="url(#arrGold)"/>
 
-            <!-- Flechas inter-capa principales -->
-            <line x1="179" y1="75" x2="239" y2="138" stroke="#0284C7" stroke-width="2.2" marker-end="url(#arrBlue)"/>
-            <text x="208" y="96" text-anchor="middle" font-size="9" font-weight="700" fill="#0284C7">Teclas</text>
+            <!-- Flechas inter-capa limpias sin cruzar textos -->
+            <line x1="179" y1="94" x2="245" y2="150" stroke="#0284C7" stroke-width="2.2" marker-end="url(#arrBlue)"/>
+            <rect x="190" y="92" width="44" height="16" rx="4" fill="#FFFFFF" stroke="#BAE6FD"/>
+            <text x="212" y="103" text-anchor="middle" font-size="9" font-weight="700" fill="#0284C7">Teclas</text>
 
-            <line x1="418" y1="138" x2="482" y2="80" stroke="#0284C7" stroke-width="2.2" marker-end="url(#arrBlue)"/>
-            <line x1="418" y1="164" x2="482" y2="164" stroke="#0284C7" stroke-width="2.2" marker-end="url(#arrBlue)"/>
-            <path d="M 418 124 C 455 18, 760 18, 827 78" fill="none" stroke="#0284C7" stroke-width="2.2" marker-end="url(#arrBlue)"/>
-            <text x="622" y="24" text-anchor="middle" font-size="9.5" font-weight="700" fill="#0284C7">Fotograma en orden pintor (solo lectura de entidades)</text>
+            <line x1="424" y1="150" x2="485" y2="96" stroke="#0284C7" stroke-width="2.2" marker-end="url(#arrBlue)"/>
+            <line x1="424" y1="174" x2="485" y2="174" stroke="#0284C7" stroke-width="2.2" marker-end="url(#arrBlue)"/>
+            <line x1="766" y1="168" x2="830" y2="112" stroke="#475569" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrSlate)"/>
 
-            <line x1="760" y1="156" x2="828" y2="104" stroke="#475569" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrSlate)"/>
+            <!-- Ruta superior despejada DoomGame -> Renderer -->
+            <path d="M 412 131 L 412 18 L 961 18 L 961 65" fill="none" stroke="#0284C7" stroke-width="2.2" marker-end="url(#arrBlue)"/>
+            <rect x="526" y="7" width="320" height="22" rx="11" fill="#EFF6FF" stroke="#0284C7" stroke-width="1.2"/>
+            <text x="686" y="21" text-anchor="middle" font-size="10" font-weight="800" fill="#0284C7">Fotograma en orden pintor (solo lectura de entidades)</text>
 
-            <!-- Capa Inferior: OS de Hack -->
-            <rect x="10" y="344" width="1100" height="52" rx="10" fill="#0F172A" stroke="#00B4D8" stroke-width="2"/>
-            <text x="155" y="375" text-anchor="middle" font-size="13" font-weight="800" fill="#00B4D8">5. SISTEMA OPERATIVO DE HACK (JACK OS &amp; VM HARDWARE)</text>
-            <rect x="355" y="354" width="110" height="32" rx="6" fill="#1E293B" stroke="#334155"/>
-            <text x="410" y="374" text-anchor="middle" font-family="monospace" font-size="11.5" font-weight="700" fill="#FFFFFF">Keyboard</text>
-            <rect x="478" y="354" width="110" height="32" rx="6" fill="#1E293B" stroke="#334155"/>
-            <text x="533" y="374" text-anchor="middle" font-family="monospace" font-size="11.5" font-weight="700" fill="#FFFFFF">Screen</text>
-            <rect x="601" y="354" width="110" height="32" rx="6" fill="#1E293B" stroke="#334155"/>
-            <text x="656" y="374" text-anchor="middle" font-family="monospace" font-size="11.5" font-weight="700" fill="#FFFFFF">Output</text>
-            <rect x="724" y="354" width="110" height="32" rx="6" fill="#1E293B" stroke="#334155"/>
-            <text x="779" y="374" text-anchor="middle" font-family="monospace" font-size="11.5" font-weight="700" fill="#FFFFFF">Memory</text>
-            <rect x="847" y="354" width="110" height="32" rx="6" fill="#1E293B" stroke="#334155"/>
-            <text x="902" y="374" text-anchor="middle" font-family="monospace" font-size="11.5" font-weight="700" fill="#FFFFFF">Math</text>
-            <rect x="970" y="354" width="122" height="32" rx="6" fill="#1E293B" stroke="#D4A017"/>
-            <text x="1031" y="374" text-anchor="middle" font-family="monospace" font-size="11.5" font-weight="700" fill="#FDE68A">Sys (25ms)</text>
+            <!-- Capa Inferior: OS de Hack (x=10..1110, y=338..388) -->
+            <rect x="10" y="338" width="1100" height="50" rx="10" fill="#0F172A" stroke="#00B4D8" stroke-width="2"/>
+            <text x="26" y="367" text-anchor="start" font-size="12" font-weight="800" fill="#00B4D8">5. JACK OS &amp; HARDWARE HACK</text>
 
-            <line x1="102" y1="328" x2="410" y2="352" stroke="#475569" stroke-width="1.5" marker-end="url(#arrSlate)"/>
-            <line x1="892" y1="300" x2="533" y2="352" stroke="#0284C7" stroke-width="1.8" marker-end="url(#arrBlue)"/>
-            <line x1="1028" y1="300" x2="656" y2="352" stroke="#D4A017" stroke-width="1.8" marker-end="url(#arrGold)"/>
-            <line x1="330" y1="328" x2="1031" y2="352" stroke="#D4A017" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrGold)"/>
+            <rect x="276" y="347" width="124" height="32" rx="6" fill="#1E293B" stroke="#334155"/>
+            <text x="338" y="367" text-anchor="middle" font-family="monospace" font-size="11.5" font-weight="700" fill="#FFFFFF">Keyboard</text>
+
+            <rect x="412" y="347" width="124" height="32" rx="6" fill="#1E293B" stroke="#334155"/>
+            <text x="474" y="367" text-anchor="middle" font-family="monospace" font-size="11.5" font-weight="700" fill="#FFFFFF">Screen</text>
+
+            <rect x="548" y="347" width="124" height="32" rx="6" fill="#1E293B" stroke="#334155"/>
+            <text x="610" y="367" text-anchor="middle" font-family="monospace" font-size="11.5" font-weight="700" fill="#FFFFFF">Output</text>
+
+            <rect x="684" y="347" width="124" height="32" rx="6" fill="#1E293B" stroke="#334155"/>
+            <text x="746" y="367" text-anchor="middle" font-family="monospace" font-size="11.5" font-weight="700" fill="#FFFFFF">Memory</text>
+
+            <rect x="820" y="347" width="124" height="32" rx="6" fill="#1E293B" stroke="#334155"/>
+            <text x="882" y="367" text-anchor="middle" font-family="monospace" font-size="11.5" font-weight="700" fill="#FFFFFF">Math</text>
+
+            <rect x="956" y="347" width="136" height="32" rx="6" fill="#1E293B" stroke="#D4A017"/>
+            <text x="1024" y="367" text-anchor="middle" font-family="monospace" font-size="11.5" font-weight="700" fill="#FDE68A">Sys (25ms)</text>
+
+            <!-- Conectores limpios hacia hardware / OS -->
+            <line x1="102" y1="324" x2="318" y2="345" stroke="#475569" stroke-width="1.5" marker-end="url(#arrSlate)"/>
+            <line x1="336" y1="324" x2="994" y2="345" stroke="#D4A017" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrGold)"/>
+            <line x1="893" y1="308" x2="496" y2="345" stroke="#0284C7" stroke-width="1.8" marker-end="url(#arrBlue)"/>
+            <line x1="1029" y1="308" x2="628" y2="345" stroke="#D4A017" stroke-width="1.8" marker-end="url(#arrGold)"/>
           </svg>
         </div>
 
         <!-- 3 Principios de arquitectura -->
-        <div class="grid grid-cols-3 gap-4 mt-1">
-          <div class="accent-card-light px-4 py-2.5">
+        <div class="grid grid-cols-3 gap-4">
+          <div class="accent-card-light px-4 py-2">
             <div class="text-xs font-extrabold text-[#0284C7] uppercase">Grafo Acíclico Estricto</div>
             <p class="text-xs text-slate-600 mt-0.5">Cero dependencias circulares entre las seis capas de software.</p>
           </div>
-          <div class="accent-card-light px-4 py-2.5">
+          <div class="accent-card-light px-4 py-2">
             <div class="text-xs font-extrabold text-[#0284C7] uppercase">Separación Modelo / Vista</div>
             <p class="text-xs text-slate-600 mt-0.5">La capa visual únicamente consulta estado sin modificar entidades.</p>
           </div>
-          <div class="accent-card-light px-4 py-2.5">
+          <div class="accent-card-light px-4 py-2">
             <div class="text-xs font-extrabold text-[#0284C7] uppercase">Propiedad Única de Recursos</div>
             <p class="text-xs text-slate-600 mt-0.5">El orquestador central asigna al inicio y libera en orden inverso.</p>
           </div>
@@ -1012,7 +1028,7 @@
 
               <!-- Bloque Particion VRAM -->
               <rect x="206" y="190" width="382" height="132" rx="10" fill="#0F172A" stroke="#334155"/>
-              <text x="222" y="212" font-size="11.5" font-weight="800" fill="#FFFFFF">PARTICIÓN ESTRICTA DE VRAM (8,192 PALABRAS = 131,072 PÍXELES)</text>
+              <text x="397" y="212" text-anchor="middle" font-size="11" font-weight="800" fill="#FFFFFF">PARTICIÓN DE VRAM (8,192 PALABRAS &bull; 512&times;256 PX)</text>
               <rect x="222" y="226" width="350" height="44" rx="6" fill="#FFFFFF"/>
               <text x="397" y="245" text-anchor="middle" font-size="10.5" font-weight="800" fill="#0F172A">Viewport 3D [RAM 16384..23007] &bull; Filas 0..206</text>
               <text x="397" y="261" text-anchor="middle" font-size="9.5" font-weight="700" fill="#0284C7">Recorte matemático impide invasión de fila 207</text>
@@ -1405,7 +1421,7 @@
 
         <div class="my-auto flex flex-col gap-5">
           <div class="text-center max-w-4xl mx-auto">
-            <h2 class="text-4xl xl:text-5xl font-black tracking-tight text-white">
+            <h2 class="text-3xl font-black tracking-tight text-white">
               Ingeniería Determinística Lista para Escalar
             </h2>
             <p class="mt-2 text-base text-slate-300">
@@ -1461,7 +1477,7 @@
               <div class="min-w-0 flex-1">
                 <div class="text-xs font-bold uppercase tracking-wider text-[#00B4D8]">Repositorio Oficial en GitHub</div>
                 <div class="text-sm font-bold text-white mt-0.5 truncate" contenteditable="true" spellcheck="false">
-                  https://github.com/usuario/hellgate-16-doom-hack
+                  https://github.com/Mateoslp/doom-hack
                 </div>
                 <div class="text-xs text-slate-400 mt-0.5">16 clases comentadas, suites automatizadas y README técnico</div>
               </div>
@@ -1476,7 +1492,7 @@
               <div class="min-w-0 flex-1">
                 <div class="text-xs font-bold uppercase tracking-wider text-[#D4A017]">Video Arquitectónico en YouTube</div>
                 <div class="text-sm font-bold text-white mt-0.5 truncate" contenteditable="true" spellcheck="false">
-                  https://youtu.be/hellgate16-arquitectura-demo
+                  https://youtu.be/OjcbvD-KOkM
                 </div>
                 <div class="text-xs text-slate-400 mt-0.5">Explicación de arquitectura, memoria y demostración funcional</div>
               </div>
@@ -1527,6 +1543,7 @@
 
   <script>
     (function () {
+      const deckEl = document.getElementById('deck');
       const slides = Array.from(document.querySelectorAll('.slide'));
       const totalSlides = slides.length;
       const counterEl = document.getElementById('slideCounter');
@@ -1536,6 +1553,18 @@
       const btnFullscreen = document.getElementById('btnFullscreen');
       const btnPrint = document.getElementById('btnPrint');
       const btnTimer = document.getElementById('btnTimer');
+
+      function updateDeckScale() {
+        const scale = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+        deckEl.style.transform = 'scale(' + scale.toFixed(4) + ')';
+      }
+
+      window.addEventListener('resize', updateDeckScale);
+      window.addEventListener('beforeprint', () => {
+        deckEl.style.transform = 'none';
+      });
+      window.addEventListener('afterprint', updateDeckScale);
+      updateDeckScale();
 
       let currentIndex = 0;
 
