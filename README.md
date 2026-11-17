@@ -20,7 +20,8 @@
 
 ## Video de Demostración y Arquitectura (YouTube)
 
-> 🎥 **Video de Funcionamiento y Arquitectura en YouTube:** https://youtu.be/OjcbvD-KOkM
+> 🎥 **Video de Funcionamiento en YouTube:** https://youtu.be/OjcbvD-KOkM
+> **Arquitectura y explicación del proyecto** https://coruscating-otter-f3400e.netlify.app
 
 ---
 
