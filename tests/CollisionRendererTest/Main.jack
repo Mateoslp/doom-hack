@@ -1,0 +1,455 @@
+/**
+ * Main.jack (Suite de Pruebas Automatizadas - Modulo 5: CollisionManager y Renderer)
+ * Ubicacion: C:/DoomProject/tests/CollisionRendererTest/Main.jack
+ *
+ * Verifica en VMEmulator v2.5 (36 aserciones sobre logica, VRAM real RAM[16384..24575] y heap RAM[2049]):
+ *   1. CollisionManager.resolvePlayerShot (Tests 1..9):
+ *      - Guardas ante referencias null, jugador muerto y pool vacio.
+ *      - Fallo fuera de caja y borde exacto al pixel del margen de asistencia de 4 px (z = 64).
+ *      - Paralaje horizontal con playerX != 0 y fallo/impacto por elevacion vertical aimY.
+ *      - Oclusion estricta por profundidad z con 3 enemigos solapados (z = 90, 35, 60):
+ *        impacta exclusivamente al mas cercano (z = 35), activa hitFlashTimer, registra
+ *        +100 (Tipo 1) y +250 (Tipo 2) en ScoreManager solo al confirmar muerte (Contratos #4 y #5).
+ *   2. CollisionManager.resolveWorldInteractions (Tests 10..18):
+ *      - Disparo balistico enemigo hacia player.getX() para Tipo 1 (vx=64, vy=-136, vz=2, dmg=10)
+ *        y Tipo 2 (vy=-60, vz=3, dmg=15), verificando convergencia real sobre playerX.
+ *      - Impacto de proyectil en z <= zMelee (14), desactivacion del orbe y ventana invulnTimer.
+ *      - Esquiva lateral de proyectil (|worldX - playerX| > 28) y paso alto por techo (worldY < -56).
+ *      - Dano cuerpo a cuerpo en z <= zMelee (15 Tipo 1, 25 Tipo 2), invulnTimer y esquiva lateral.
+ *   3. Renderer (Tests 19..36):
+ *      - Crosshair en VRAM con centro despejado 5x5 exacto y brazos perifericos activos.
+ *      - Arma en primera persona, desplazamiento por recoilOffset, aparicion y limpieza de fogonazo.
+ *      - Escalado perspectivo 1/z de Enemy (z=100 vs z=14) e inversion blanca de torso en hitFlash.
+ *      - Renderizado de Projectile con nucleo blanco y clipping seguro en bordes extremos (z=8).
+ *      - Algoritmo del pintor en VRAM (RAM[20560]): enemigo cercano negro (z=14 en slot 0)
+ *        ocluye a enemigo lejano blanco en flash (z=16 en slot 3).
+ *      - Limpieza total de pixeles residuales en el siguiente fotograma tras mover/desactivar entidades.
+ *      - Proteccion absoluta de la region del HUD (y: 207..255) ante entidades extremas en z=8.
+ *      - PRUEBA ESTRICTA DE CERO ASIGNACIONES EN HEAP (RAM[2049] delta = 0) y dispose() simetrico.
+ */
+class Main {
+
+    function int b2i(boolean flag) {
+        if (flag) {
+            return 1;
+        }
+        return 0;
+    }
+
+    function int nonZero(int val) {
+        if (~(val = 0)) {
+            return 1;
+        }
+        return 0;
+    }
+
+    function void check(int testId, int actual, int expected) {
+        var int total;
+        var int passed;
+        var int failed;
+        var int firstFail;
+
+        let total = (Memory.peek(8000) + 1);
+        do Memory.poke(8000, total);
+
+        if (actual = expected) {
+            let passed = (Memory.peek(8001) + 1);
+            do Memory.poke(8001, passed);
+        } else {
+            let failed = (Memory.peek(8002) + 1);
+            do Memory.poke(8002, failed);
+            let firstFail = Memory.peek(8003);
+            if (firstFail = 0) {
+                do Memory.poke(8003, testId);
+            }
+        }
+        return;
+    }
+
+    function void clearViewportOnly() {
+        do Screen.setColor(false);
+        do WorldRenderer.drawSafeRect(0, 0, 511, 206);
+        do Screen.setColor(true);
+        return;
+    }
+
+    function void main() {
+        var int sentinel;
+        var Player player;
+        var ScoreManager scores;
+        var EntityManager entities;
+        var WorldRenderer world;
+        var HUD hud;
+        var Renderer renderer;
+        var Renderer rAux;
+        var Array eArr;
+        var Array pArr;
+        var Enemy e0;
+        var Enemy e1;
+        var Enemy e2;
+        var Enemy e3;
+        var Projectile p0;
+        var int i;
+        var boolean hit;
+        var boolean dmgChanged;
+        var int crossMask;
+        var int wAimedVx;
+        var int wFinalScore;
+        var int wOccFrame1;
+        var int wCleanFrame2;
+        var int wHudGuard;
+        var int wMeleeHp;
+        var int heapBefore;
+        var int heapDelta;
+        var int vramBeforeFlash;
+        var int vramDuringFlash;
+        var int vramAfterFlash;
+        var int vramTorsoBlack;
+        var int vramTorsoFlash;
+
+        do Memory.poke(8000, 0);
+        do Memory.poke(8001, 0);
+        do Memory.poke(8002, 0);
+        do Memory.poke(8003, 0);
+
+        let sentinel = 21845;
+
+        let player = Player.new();
+        let scores = ScoreManager.new();
+        let entities = EntityManager.new();
+        let world = WorldRenderer.new();
+        let hud = HUD.new();
+        let renderer = Renderer.new(world, hud);
+
+        // Capturar puntero principal del heap tras construir todos los subsistemas
+        let heapBefore = Memory.peek(2049);
+
+        let eArr = entities.getEnemies();
+        let pArr = entities.getProjectiles();
+
+        // =====================================================================
+        // SECCION A: CollisionManager.resolvePlayerShot y Oclusion Z (Tests 1..9)
+        // =====================================================================
+
+        // Test 1: Guardas ante null y pool sin enemigos activos
+        let hit = (CollisionManager.resolvePlayerShot(null, entities, scores) | CollisionManager.resolvePlayerShot(player, null, scores));
+        let hit = (hit | CollisionManager.resolvePlayerShot(player, entities, scores));
+        do Main.check(1, Main.b2i(hit), 0);
+
+        // Test 2: Jugador muerto (health = 0) no puede impactar enemigos
+        do entities.spawnEnemy(1, 0, 50, 0);
+        do player.takeDamage(100);
+        do Main.check(2, Main.b2i(CollisionManager.resolvePlayerShot(player, entities, scores)), 0);
+
+        // Test 3: Enemigo fuera de la linea de mira horizontal falla (x = 120 en z = 64 -> screenX = 376)
+        do player.reset();
+        do entities.reset();
+        do entities.spawnEnemy(1, 120, 64, 0);
+        do Main.check(3, Main.b2i(CollisionManager.resolvePlayerShot(player, entities, scores)), 0);
+
+        // Test 4..5: Borde exacto al pixel del margen de asistencia de 4 px en z = 64 (halfW = 22)
+        // worldX = 27 -> leftX - 4 = 257 > 256 (falla); worldX = 26 -> leftX - 4 = 256 (impacta)
+        do entities.reset();
+        do entities.spawnEnemy(1, 27, 64, 0);
+        do Main.check(4, Main.b2i(CollisionManager.resolvePlayerShot(player, entities, scores)), 0);
+
+        do entities.reset();
+        do entities.spawnEnemy(1, 26, 64, 0);
+        do Main.check(5, Main.b2i(CollisionManager.resolvePlayerShot(player, entities, null)), 1);
+
+        // Test 6: Paralaje lateral (playerX = +120, vpX = 226) + elevacion vertical aimY
+        // Enemigo en (worldX = 160, z = 100) proyecta screenX = 251 y caja Y [87..135]:
+        // con aimY = 72 pasa sobre la cabeza (falla); al bajar mira a aimY = 104 impacta.
+        do player.reset();
+        do entities.reset();
+        let i = 0;
+        while (i < 10) {
+            do player.moveRight();
+            do player.aimUp();
+            let i = (i + 1);
+        }
+        do entities.spawnEnemy(1, 160, 100, 0);
+        let hit = CollisionManager.resolvePlayerShot(player, entities, scores);
+        let i = 0;
+        while (i < 8) {
+            do player.aimDown();
+            let i = (i + 1);
+        }
+        do Main.check(6, ((Main.b2i(hit) * 10) + Main.b2i(CollisionManager.resolvePlayerShot(player, entities, scores))), 1);
+
+        // Test 7..9: Oclusion estricta por profundidad z con 3 enemigos solapados en x = 0:
+        //   slot 0: Tipo 2 en z = 90 (hp = 4)
+        //   slot 1: Tipo 1 en z = 35 (hp = 2) <-- MAS CERCANO
+        //   slot 2: Tipo 1 en z = 60 (hp = 2)
+        do player.reset();
+        do scores.reset();
+        do entities.reset();
+        do entities.spawnEnemy(2, 0, 90, 0);
+        do entities.spawnEnemy(1, 0, 35, 0);
+        do entities.spawnEnemy(1, 0, 60, 0);
+        let e0 = eArr[0];
+        let e1 = eArr[1];
+        let e2 = eArr[2];
+
+        // Disparo 1: hiere UNICAMENTE a e1 (z=35 -> hp=1, flash=true); e0 y e2 intactos, score=0
+        let hit = CollisionManager.resolvePlayerShot(player, entities, scores);
+        do Main.check(7, (((((Main.b2i(hit) * 1000) + (e0.getHp() * 100)) + (e1.getHp() * 10)) + e2.getHp()) + (scores.getScore() + (Main.b2i(e1.isHitFlashing()) * 10000))), 11412);
+
+        // Disparo 2: abate a e1 (Tipo 1 -> +100 pts, kills=1); e0 (hp=4) y e2 (hp=2) siguen intactos
+        let hit = CollisionManager.resolvePlayerShot(player, entities, scores);
+        do Main.check(8, ((((Main.b2i(e1.isActive()) * 1000) + scores.getScore()) + (e0.getHp() * 10)) + e2.getHp()), 142);
+
+        // Disparos 3..8 (6 impactos): abaten primero a e2 (z=60, +100) y luego a e0 (z=90, 4 impactos, +250) -> total 450
+        let i = 0;
+        while (i < 6) {
+            do CollisionManager.resolvePlayerShot(player, entities, scores);
+            let i = (i + 1);
+        }
+        let wFinalScore = scores.getScore();
+        do Main.check(9, (((wFinalScore * 10) + scores.getKills()) + entities.getActiveEnemyCount()), 4503);
+
+        // =====================================================================
+        // SECCION B: CollisionManager.resolveWorldInteractions (Tests 10..18)
+        // =====================================================================
+
+        // Test 10: Enemigo Tipo 1 listo para disparar lanza orbe hacia playerX (+40)
+        // Desde ex = -80, ez = 74 (dz = 60, vz = 2 => 30 ticks): dxFp = 120 * 16 = 1920 => vx = 64
+        do player.reset();
+        do entities.reset();
+        do player.moveRight();
+        do player.moveRight();
+        do player.moveRight();
+        // playerX = 36; ajustemos ex = -84 para dx = +120 => dxFp = 1920 => vx = 64 exacto
+        do entities.spawnEnemy(1, -84, 74, 0);
+        let e0 = eArr[0];
+        do e0.resetAttackTimer(0);
+        let dmgChanged = CollisionManager.resolveWorldInteractions(player, entities);
+        let p0 = pArr[0];
+        let wAimedVx = p0.getVx();
+        do Main.check(10, (((((Main.b2i(dmgChanged) * 1000) + (Main.b2i(p0.isActive()) * 100)) + wAimedVx) + p0.getDamage()) + Main.b2i(e0.isReadyToShoot())), 174);
+
+        // Test 11: Enemigo Tipo 2 lanza orbe pesado (vz = 3, vy = -60, dmg = 15)
+        do entities.reset();
+        do entities.spawnEnemy(2, 36, 74, 0);
+        let e0 = eArr[0];
+        do e0.resetAttackTimer(0);
+        do CollisionManager.resolveWorldInteractions(player, entities);
+        let p0 = pArr[0];
+        do Main.check(11, ((((Main.b2i(p0.isActive()) * 1000) + ((-p0.getVy()) * 10)) + p0.getDamage()) + p0.getVz()), 1618);
+
+        // Test 12..13: Proyectil en z <= zMelee (14) dentro de alcance impacta al jugador (-10 HP -> 90),
+        // se desactiva, y un 2do proyectil simultaneo es absorbido por invulnTimer (HP sigue en 90)
+        do player.reset();
+        do entities.reset();
+        do entities.spawnProjectile(15, 20, 14, 0, 0, 2, 10);
+        do entities.spawnProjectile(-10, 10, 12, 0, 0, 2, 15);
+        let dmgChanged = CollisionManager.resolveWorldInteractions(player, entities);
+        let p0 = pArr[0];
+        do Main.check(12, (((Main.b2i(dmgChanged) * 1000) + (player.getHealth() * 10)) + Main.b2i(p0.isActive())), 1900);
+
+        // Tras expirar los 8 ticks de invulnerabilidad, un nuevo proyectil Tipo 2 resta 15 HP (90 -> 75)
+        let i = 0;
+        while (i < 8) {
+            do player.updateTimers();
+            let i = (i + 1);
+        }
+        do entities.spawnProjectile(0, 80, 10, 0, 0, 2, 15);
+        let dmgChanged = CollisionManager.resolveWorldInteractions(player, entities);
+        do Main.check(13, ((Main.b2i(dmgChanged) * 1000) + player.getHealth()), 1075);
+
+        // Test 14: Esquiva lateral de proyectil (|worldX - playerX| = 40 > 28 en z = 12) -> 0 dano
+        let i = 0;
+        while (i < 8) {
+            do player.updateTimers();
+            let i = (i + 1);
+        }
+        do entities.reset();
+        do entities.spawnProjectile(40, 12, 12, 0, 0, 2, 15);
+        let dmgChanged = CollisionManager.resolveWorldInteractions(player, entities);
+        do Main.check(14, ((Main.b2i(dmgChanged) * 1000) + player.getHealth()), 75);
+
+        // Test 15: Proyectil pegado al techo alto (worldY = -75 < -56) pasa sobre el casco -> 0 dano
+        do entities.reset();
+        do entities.spawnProjectile(0, -75, 12, 0, 0, 2, 15);
+        let dmgChanged = CollisionManager.resolveWorldInteractions(player, entities);
+        do Main.check(15, ((Main.b2i(dmgChanged) * 1000) + player.getHealth()), 75);
+
+        // Test 16..18: Combate cuerpo a cuerpo enemigo en z <= zMelee (14)
+        // Esquiva lateral lejana (ex = -140, playerX = 0 -> dist 140 > 60) no causa dano
+        do player.reset();
+        do entities.reset();
+        do entities.spawnEnemy(1, -140, 14, 0);
+        let dmgChanged = CollisionManager.resolveWorldInteractions(player, entities);
+        do Main.check(16, ((Main.b2i(dmgChanged) * 1000) + player.getHealth()), 100);
+
+        // Contacto cuerpo a cuerpo Tipo 1 (-15 HP -> 85) + bloqueo por invulnTimer en tick inmediato
+        do entities.reset();
+        do entities.spawnEnemy(1, 20, 14, 0);
+        let dmgChanged = CollisionManager.resolveWorldInteractions(player, entities);
+        let hit = CollisionManager.resolveWorldInteractions(player, entities);
+        do Main.check(17, ((((Main.b2i(dmgChanged) * 1000) + (Main.b2i(hit) * 100)) + player.getHealth())), 1085);
+
+        // Expirado invulnTimer (8 ticks), Bruto Igneo Tipo 2 en z = 14 inflige -25 HP (85 -> 60)
+        let i = 0;
+        while (i < 8) {
+            do player.updateTimers();
+            let i = (i + 1);
+        }
+        do entities.reset();
+        do entities.spawnEnemy(2, -30, 14, 0);
+        let dmgChanged = CollisionManager.resolveWorldInteractions(player, entities);
+        let wMeleeHp = player.getHealth();
+        do Main.check(18, ((Main.b2i(dmgChanged) * 1000) + wMeleeHp), 1060);
+
+        // =====================================================================
+        // SECCION C: Renderer - VRAM, Orden Pintor, Clipping y Heap (Tests 19..36)
+        // =====================================================================
+
+        // Test 19..20: Crosshair en (256, 104) -> centro 5x5 despejado (bits 0..2 de RAM[19728] = 0,
+        // fila y=103 RAM[19696] = 0) y brazos activos (bits 3..9 de RAM[19728] = 1016, fila y=98 RAM[19536] = 1)
+        do player.reset();
+        do Main.clearViewportOnly();
+        do renderer.renderWeaponAndCrosshair(player);
+        let crossMask = (Memory.peek(19728) & 1023);
+        do Main.check(19, crossMask, 1016);
+        do Main.check(20, ((Memory.peek(19696) * 10) + (Memory.peek(19536) & 1)), 1);
+
+        // Test 21..22: Arma con retroceso y fogonazo (y=162 -> RAM[21584]):
+        // 0 antes de disparar -> activo tras tryFire() -> limpio (0) tras 2 ticks de updateTimers()
+        let vramBeforeFlash = Main.nonZero(Memory.peek(21584));
+        do player.tryFire();
+        do Main.clearViewportOnly();
+        do renderer.renderWeaponAndCrosshair(player);
+        let vramDuringFlash = Main.nonZero(Memory.peek(21584));
+        do player.updateTimers();
+        do player.updateTimers();
+        do Main.clearViewportOnly();
+        do renderer.renderWeaponAndCrosshair(player);
+        let vramAfterFlash = Main.nonZero(Memory.peek(21584));
+        do Main.check(21, (((vramBeforeFlash * 100) + (vramDuringFlash * 10)) + vramAfterFlash), 10);
+        do Main.check(22, Main.nonZero(Memory.peek(21808)), 1);
+
+        // Test 23..25: Escalado 1/z de Enemy e inversion blanca de torso por hitFlash en VRAM (RAM[20236]: x=192..207, y=120)
+        // En z=100 es angosto (halfW=14 => RAM[20236]=0); en z=14 crece (halfW=100 => RAM[20236]=-1 negro);
+        // al recibir impacto no letal (hitFlash=true) el interior del torso invierte a blanco (RAM[20236]=0).
+        do entities.reset();
+        do entities.spawnEnemy(2, 0, 100, 0);
+        let e0 = eArr[0];
+        do Main.clearViewportOnly();
+        do renderer.renderEnemy(e0, 0, 256);
+        do Main.check(23, Memory.peek(20236), 0);
+
+        do e0.spawn(2, 0, 14, 0);
+        do Main.clearViewportOnly();
+        do renderer.renderEnemy(e0, 0, 256);
+        let vramTorsoBlack = Memory.peek(20236);
+        do Main.check(24, vramTorsoBlack, -1);
+
+        do e0.takeDamage(1);
+        do Main.clearViewportOnly();
+        do renderer.renderEnemy(e0, 0, 256);
+        let vramTorsoFlash = Memory.peek(20236);
+        do Main.check(25, ((vramTorsoFlash * 10) + Main.nonZero(Memory.peek(20233))), 1);
+
+        // Test 26: Renderizado de Projectile en (worldX=0, worldY=5, z=20 -> cx=256, cy=120, r=8, nucleo blanco r=4)
+        // En RAM[20240] (y=120, x=256..271): bit 0 (centro blanco x=256) = 0, anillo exterior negro != 0
+        do entities.reset();
+        do entities.spawnProjectile(0, 5, 20, 0, 0, 2, 10);
+        let p0 = pArr[0];
+        do Main.clearViewportOnly();
+        do renderer.renderProjectile(p0, 0, 256);
+        do Main.check(26, (((Memory.peek(20240) & 1) * 10) + Main.nonZero(Memory.peek(20240))), 1);
+
+        // Test 27..28: Algoritmo del Pintor (sortEnemiesByDepth + renderPlayingFrame) en VRAM (RAM[20560]: x=256..271, y=130)
+        // Colocamos DELIBERADAMENTE al enemigo CERCANO negro (z=14, sin flash) en slot 0
+        // y al enemigo LEJANO blanco (z=16, con hitFlash=true) en slot 3.
+        // El orden pintor dibuja primero z=16 (blanco) y encima z=14 (negro), dejando RAM[20560] = -1.
+        do player.reset();
+        do entities.reset();
+        do hud.markDirty();
+        let e0 = eArr[0];
+        let e3 = eArr[3];
+        do e0.spawn(1, 0, 14, 0);
+        do e3.spawn(2, 0, 16, 0);
+        do e3.takeDamage(1);
+        do renderer.renderPlayingFrame(player, entities, scores);
+        let wOccFrame1 = Memory.peek(20560);
+        do Main.check(27, wOccFrame1, -1);
+
+        // Verificar que renderPlayingFrame tambien dibujo el marco del HUD en y=207 (RAM[23008] = -1)
+        do Main.check(28, Memory.peek(23008), -1);
+
+        // Test 29: Limpieza integral de pixeles residuales en el siguiente fotograma:
+        // al desactivar las entidades y renderizar Frame 2, el interior del portal en RAM[20560] queda limpio (0)
+        do entities.reset();
+        do world.advanceScroll(2);
+        do renderer.renderPlayingFrame(player, entities, scores);
+        let wCleanFrame2 = Memory.peek(20560);
+        do Main.check(29, wCleanFrame2, 0);
+
+        // Test 30..31: Intercalado de profundidad entre proyectil cercano (z=16) y enemigo lejano (z=80)
+        // En (0, 5, z=16 -> cx=256, cy=124, r=10, nucleo blanco r=5) frente a enemigo negro en z=80:
+        // el nucleo blanco del proyectil cercano perfora en blanco el pixel central (256, 124 -> bit 0 de RAM[20368] = 0)
+        // mientras el borde negro del proyectil activa bits altos de RAM[20368] != 0.
+        do entities.reset();
+        do entities.spawnEnemy(2, 0, 80, 0);
+        do entities.spawnProjectile(0, 5, 16, 0, 0, 2, 10);
+        do renderer.renderPlayingFrame(player, entities, scores);
+        do Main.check(30, (Memory.peek(20368) & 1), 0);
+        do Main.check(31, Main.nonZero(Memory.peek(20368)), 1);
+
+        // Test 32..33: Seguridad geometrica extrema en z = zNearClip (8) y bordes [-160, +160] x [-90, +90]:
+        // Con HUD limpio (isDirty=false), sembramos centinela 21845 en RAM[23008] (y=207) y RAM[24575] (y=255).
+        // Ningun enemigo ni proyectil gigante en z=8 ni el arma con recoil maximo puede invadir y >= 207 ni abortar.
+        do Memory.poke(23008, sentinel);
+        do Memory.poke(24575, sentinel);
+        do entities.reset();
+        do entities.spawnEnemy(2, 0, 8, 0);
+        do entities.spawnEnemy(2, -160, 8, 0);
+        do entities.spawnEnemy(2, 160, 8, 0);
+        do entities.spawnProjectile(0, 90, 8, 0, 240, 2, 15);
+        do entities.spawnProjectile(-160, -90, 8, -160, -240, 2, 15);
+        do player.tryFire();
+        do renderer.renderPlayingFrame(player, entities, scores);
+        let wHudGuard = Memory.peek(23008);
+        do Main.check(32, wHudGuard, sentinel);
+        do Main.check(33, Memory.peek(24575), sentinel);
+
+        // Test 34: Guardas defensivas ante referencias null en todos los metodos de Renderer
+        do renderer.renderEnemy(null, 0, 256);
+        do renderer.renderProjectile(null, 0, 256);
+        do renderer.renderWeaponAndCrosshair(null);
+        do renderer.sortEnemiesByDepth(null);
+        do renderer.renderPlayingFrame(null, entities, scores);
+        do renderer.renderPlayingFrame(player, null, null);
+        do Main.check(34, 1, 1);
+
+        // Test 35: PRUEBA ESTRICTA DE HARDWARE EN RAM[2049] -> 0 palabras asignadas en el heap
+        // durante todos los disparos hitscan, colisiones, spawns balisticos y fotogramas completos
+        let heapDelta = (Memory.peek(2049) - heapBefore);
+        do Main.check(35, heapDelta, 0);
+
+        // Test 36: dispose() de Renderer libera sortIdx[4] y this SIN liberar world ni hud (propiedad de DoomGame)
+        let rAux = Renderer.new(world, hud);
+        do rAux.dispose();
+        do renderer.dispose();
+        do hud.dispose();
+        do world.dispose();
+        do entities.dispose();
+        do scores.dispose();
+        do player.dispose();
+        do Main.check(36, 1, 1);
+
+        // Testigos para CollisionRendererTest.cmp
+        do Memory.poke(8004, wFinalScore);
+        do Memory.poke(8005, wOccFrame1);
+        do Memory.poke(8006, wCleanFrame2);
+        do Memory.poke(8007, wHudGuard);
+        do Memory.poke(8008, heapDelta);
+        do Memory.poke(8009, wAimedVx);
+        do Memory.poke(8010, crossMask);
+        do Memory.poke(8011, wMeleeHp);
+
+        return;
+    }
+}

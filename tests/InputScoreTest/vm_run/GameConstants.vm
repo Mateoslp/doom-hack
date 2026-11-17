@@ -1,0 +1,145 @@
+function GameConstants.screenWidth 0
+push constant 512
+return
+function GameConstants.screenHeight 0
+push constant 256
+return
+function GameConstants.viewportTop 0
+push constant 0
+return
+function GameConstants.viewportBottom 0
+push constant 206
+return
+function GameConstants.hudDividerY 0
+push constant 207
+return
+function GameConstants.hudDividerBottom 0
+push constant 208
+return
+function GameConstants.hudTop 0
+push constant 209
+return
+function GameConstants.hudBottom 0
+push constant 255
+return
+function GameConstants.centerX 0
+push constant 256
+return
+function GameConstants.baseHorizonY 0
+push constant 104
+return
+function GameConstants.focalLength 0
+push constant 64
+return
+function GameConstants.corridorMaxX 0
+push constant 160
+return
+function GameConstants.corridorMaxY 0
+push constant 90
+return
+function GameConstants.zSpawn 0
+push constant 100
+return
+function GameConstants.zMelee 0
+push constant 14
+return
+function GameConstants.zNearClip 0
+push constant 8
+return
+function GameConstants.fpScale 0
+push constant 16
+return
+function GameConstants.fpMaxX 0
+push constant 2560
+return
+function GameConstants.fpFloorY 0
+push constant 1440
+return
+function GameConstants.fpCeilY 0
+push constant 1440
+neg
+return
+function GameConstants.gravity 0
+push constant 12
+return
+function GameConstants.maxVy 0
+push constant 240
+return
+function GameConstants.restitutionNum 0
+push constant 7
+return
+function GameConstants.restitutionDen 0
+push constant 8
+return
+function GameConstants.playerSpeedX 0
+push constant 12
+return
+function GameConstants.playerAimSpeedY 0
+push constant 4
+return
+function GameConstants.aimMinY 0
+push constant 72
+return
+function GameConstants.aimMaxY 0
+push constant 136
+return
+function GameConstants.maxHealth 0
+push constant 100
+return
+function GameConstants.maxAmmo 0
+push constant 24
+return
+function GameConstants.fireCooldownTicks 0
+push constant 4
+return
+function GameConstants.invulnTicks 0
+push constant 8
+return
+function GameConstants.maxEnemies 0
+push constant 4
+return
+function GameConstants.maxProjectiles 0
+push constant 5
+return
+function GameConstants.frameDelayMs 0
+push constant 25
+return
+function GameConstants.keySpace 0
+push constant 32
+return
+function GameConstants.keyEnter 0
+push constant 128
+return
+function GameConstants.keyEsc 0
+push constant 140
+return
+function GameConstants.keyLeft 0
+push constant 130
+return
+function GameConstants.keyUp 0
+push constant 131
+return
+function GameConstants.keyRight 0
+push constant 132
+return
+function GameConstants.keyDown 0
+push constant 133
+return
+function GameConstants.keyA 0
+push constant 65
+return
+function GameConstants.keyD 0
+push constant 68
+return
+function GameConstants.keyW 0
+push constant 87
+return
+function GameConstants.keyS 0
+push constant 83
+return
+function GameConstants.keyP 0
+push constant 80
+return
+function GameConstants.keyR 0
+push constant 82
+return

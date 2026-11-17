@@ -1,0 +1,32 @@
+/**
+ * GameState.jack
+ * Define los identificadores enteros constantes de la maquina de estados global
+ * conforme al GDD y a la arquitectura congelada:
+ *   - MENU      (0): Estado inicial al arrancar el sistema.
+ *   - PLAYING   (1): Partida activa en ejecucion.
+ *   - PAUSED    (2): Simulacion congelada temporalmente.
+ *   - GAME_OVER (3): Fin de partida tras agotarse la salud del jugador.
+ */
+class GameState {
+
+    /** Estado inicial del juego (0). */
+    function int menu() {
+        return 0;
+    }
+
+    /** Estado de partida activa (1). */
+    function int playing() {
+        return 1;
+    }
+
+    /** Estado de pausa (2). */
+    function int paused() {
+        return 2;
+    }
+
+    /** Estado de derrota / fin de partida (3). */
+    function int gameOver() {
+        return 3;
+    }
+}
+

@@ -1,0 +1,380 @@
+/**
+ * HUD.jack
+ * Subsistema de interfaz tactica inferior (y: 207..255, filas Output 19..22) y
+ * pantallas de estado MENU, PAUSED y GAME_OVER (Modulo 3 / Capa 4 / Ficha Tecnica #14).
+ *
+ * Propiedades criticas de ingenieria:
+ *   1. Preasigna exactamente 17 instancias String en new() y las libera en dispose().
+ *      Cero literales "..." y cero llamadas a Memory.alloc en updateIfNeeded,
+ *      drawStaticFrame o pantallas de estado (elimina fugas Sys.error(6)).
+ *   2. Actualizacion diferencial bajo bandera isDirty: en fotogramas sin cambios de
+ *      estado/salud/municion/puntaje realiza 0 llamadas a Output y 0 llamadas a Screen.
+ *   3. clearTextField borra digitos residuales (ej. 100 -> 90, 24/24 -> 9/24) y acota
+ *      columnas a <= 57 para impedir que Output.printString alcance col 64 y envuelva
+ *      el cursor hacia la fila 0 del viewport 3D.
+ */
+class HUD {
+
+    field boolean isDirty;
+    field boolean frameDrawn;
+
+    // 17 cadenas constantes preasignadas en el constructor (0 allocs en el game loop)
+    field String sBlank5;
+    field String sHpLabel;
+    field String sAmmoLabel;
+    field String sSlashMax;
+    field String sReloadHint;
+    field String sScoreLabel;
+    field String sKillsLabel;
+    field String sStatePlay;
+    field String sStatePause;
+    field String sStateDead;
+    field String sTitle;
+    field String sControls1;
+    field String sControls2;
+    field String sHighLabel;
+    field String sMenuPrompt;
+    field String sPausePrompt;
+    field String sGameOverTitle;
+
+    /** Reserva una sola vez las 17 etiquetas String constantes e inicia el HUD como sucio. */
+    constructor HUD new() {
+        let isDirty = true;
+        let frameDrawn = false;
+
+        let sBlank5 = "     ";
+        let sHpLabel = "HP:";
+        let sAmmoLabel = "AMMO:";
+        let sSlashMax = "/24";
+        let sReloadHint = "RECARGA [R]";
+        let sScoreLabel = "SCORE:";
+        let sKillsLabel = "KILLS:";
+        let sStatePlay = "PLAY W:";
+        let sStatePause = "PAUSED";
+        let sStateDead = "DEAD";
+        let sTitle = "HELLGATE 16 - ABISMO DE SILICIO";
+        let sControls1 = "MOVER: A/D o FLECHAS | MIRA: W/S";
+        let sControls2 = "DISPARO: ESPACIO | R: RECARGA | P: PAUSA";
+        let sHighLabel = "RECORD SESION: ";
+        let sMenuPrompt = "[ESPACIO] o [ENTER] PARA INICIAR";
+        let sPausePrompt = "PAUSA - [P] CONTINUAR | [ESC] MENU";
+        let sGameOverTitle = "GAME OVER - [R] REINICIAR | [ESC] MENU";
+
+        return this;
+    }
+
+    /** Marca que los indicadores cambiaron y deben refrescarse en el proximo ciclo. */
+    method void markDirty() {
+        let isDirty = true;
+        return;
+    }
+
+    /** Invalida el marco estatico inferior al cambiar de pantalla completa o reiniciar. */
+    method void resetFrame() {
+        let frameDrawn = false;
+        let isDirty = true;
+        return;
+    }
+
+    /**
+     * Dibuja una sola vez la estructura estatica de la barra inferior en y = 207..255
+     * (viga divisoria doble, pilares separadores, marco de barra HP y etiquetas fijas).
+     * Jamas escribe en el viewport 3D (y = 0..206).
+     */
+    method void drawStaticFrame() {
+        var int maxX;
+        var int divTop;
+        var int divBot;
+        var int botY;
+
+        let maxX = (GameConstants.screenWidth() - 1);
+        let divTop = GameConstants.hudDividerY();
+        let divBot = GameConstants.hudDividerBottom();
+        let botY = GameConstants.hudBottom();
+
+        // Limpiar banda completa del HUD (207..255) en blanco
+        do Screen.setColor(false);
+        do Screen.drawRectangle(0, divTop, maxX, botY);
+
+        // Viga divisoria superior doble (207..208), bordes exteriores y 3 pilares verticales
+        do Screen.setColor(true);
+        do Screen.drawRectangle(0, divTop, maxX, divBot);
+        do Screen.drawLine(0, botY, maxX, botY);
+        do Screen.drawRectangle(0, divTop, 1, botY);
+        do Screen.drawRectangle((maxX - 1), divTop, maxX, botY);
+
+        // Pilares en columnas 17 (x=136), 33 (x=264) y 50 (x=400) sin solapar texto
+        do Screen.drawRectangle(136, divTop, 137, botY);
+        do Screen.drawRectangle(264, divTop, 265, botY);
+        do Screen.drawRectangle(400, divTop, 401, botY);
+
+        // Marco exterior de la barra grafica de salud (interior util: x=12..112, y=236..244)
+        do Screen.drawRectangle(11, 235, 113, 245);
+        do Screen.setColor(false);
+        do Screen.drawRectangle(12, 236, 112, 244);
+        do Screen.setColor(true);
+
+        // Etiquetas fijas en filas 20..21 (pixeles verticales y = 221..242)
+        do Output.moveCursor(20, 1);
+        do Output.printString(sHpLabel);
+
+        do Output.moveCursor(20, 18);
+        do Output.printString(sAmmoLabel);
+
+        do Output.moveCursor(20, 34);
+        do Output.printString(sScoreLabel);
+
+        do Output.moveCursor(21, 34);
+        do Output.printString(sKillsLabel);
+
+        let frameDrawn = true;
+        let isDirty = true;
+        return;
+    }
+
+    /**
+     * Sincroniza los valores dinamicos del HUD unicamente cuando isDirty es verdadero
+     * (o si el marco estatico aun no ha sido trazado). Limpia isDirty = false al terminar.
+     */
+    method void updateIfNeeded(Player player, ScoreManager scores, int state) {
+        var int hp;
+        var int ammo;
+        var int sc;
+        var int kl;
+        var int wv;
+
+        if (~frameDrawn) {
+            do drawStaticFrame();
+        }
+
+        if (~isDirty) {
+            return;
+        }
+
+        if ((player = null) | (scores = null)) {
+            let isDirty = false;
+            return;
+        }
+
+        let hp = MathUtils.clamp(player.getHealth(), 0, GameConstants.maxHealth());
+        let ammo = MathUtils.clamp(player.getAmmo(), 0, GameConstants.maxAmmo());
+        let sc = MathUtils.clamp(scores.getScore(), 0, 30000);
+        let kl = MathUtils.clamp(scores.getKills(), 0, 30000);
+        let wv = MathUtils.clamp(scores.getWave(), 1, 9999);
+
+        // 1. Modulo Salud: digitos y barra proporcional x = 12 .. (12 + hp)
+        do clearTextField(20, 5);
+        do Output.printInt(hp);
+
+        do Screen.setColor(false);
+        do Screen.drawRectangle(12, 236, 112, 244);
+        do Screen.setColor(true);
+        if (hp > 0) {
+            do Screen.drawRectangle(12, 236, (12 + hp), 244);
+        }
+
+        // 2. Modulo Municion: "ammo/24" y aviso "RECARGA [R]" en fila 21 si ammo = 0
+        do clearTextField(20, 24);
+        do Output.printInt(ammo);
+        do Output.printString(sSlashMax);
+
+        do clearTextField(21, 18);
+        do clearTextField(21, 23);
+        do clearTextField(21, 24);
+        if (ammo = 0) {
+            do Output.moveCursor(21, 18);
+            do Output.printString(sReloadHint);
+        }
+
+        // 3. Modulo Puntuacion y Bajas
+        do clearTextField(20, 41);
+        do Output.printInt(sc);
+
+        do clearTextField(21, 41);
+        do Output.printInt(kl);
+
+        // 4. Modulo Estado y Oleada (cols 51..61, sin tocar jamas col 63)
+        do clearTextField(20, 51);
+        do clearTextField(20, 56);
+        do clearTextField(20, 57);
+        do Output.moveCursor(20, 51);
+
+        if (state = GameState.paused()) {
+            do Output.printString(sStatePause);
+        } else {
+            if (state = GameState.gameOver()) {
+                do Output.printString(sStateDead);
+            } else {
+                if (state = GameState.playing()) {
+                    do Output.printString(sStatePlay);
+                    do Output.printInt(wv);
+                } else {
+                    do Output.printString(sStatePlay);
+                    do Output.printInt(wv);
+                }
+            }
+        }
+
+        let isDirty = false;
+        return;
+    }
+
+    /**
+     * Renderiza la pantalla completa de portada MENU con marco retro, controles,
+     * record de sesion e instruccion de arranque. Invalida frameDrawn para PLAYING.
+     */
+    method void renderMenuScreen(int highScore) {
+        var int maxX;
+        var int maxY;
+        var int safeHigh;
+
+        let maxX = (GameConstants.screenWidth() - 1);
+        let maxY = (GameConstants.screenHeight() - 1);
+        let safeHigh = MathUtils.clamp(highScore, 0, 30000);
+
+        do Screen.setColor(false);
+        do Screen.drawRectangle(0, 0, maxX, maxY);
+
+        do Screen.setColor(true);
+        do Screen.drawRectangle(16, 12, (maxX - 16), (maxY - 12));
+        do Screen.setColor(false);
+        do Screen.drawRectangle(20, 16, (maxX - 20), (maxY - 16));
+        do Screen.setColor(true);
+        do Screen.drawRectangle(24, 20, (maxX - 24), (maxY - 20));
+        do Screen.setColor(false);
+        do Screen.drawRectangle(26, 22, (maxX - 26), (maxY - 22));
+        do Screen.setColor(true);
+
+        // Lineas decorativas horizontales bajo el titulo
+        do Screen.drawRectangle(48, 66, (maxX - 48), 68);
+        do Screen.drawLine(48, 184, (maxX - 48), 184);
+
+        do Output.moveCursor(4, 16);
+        do Output.printString(sTitle);
+
+        do Output.moveCursor(9, 15);
+        do Output.printString(sControls1);
+
+        do Output.moveCursor(11, 12);
+        do Output.printString(sControls2);
+
+        do Output.moveCursor(14, 21);
+        do Output.printString(sHighLabel);
+        do Output.printInt(safeHigh);
+
+        do Output.moveCursor(18, 16);
+        do Output.printString(sMenuPrompt);
+
+        let frameDrawn = false;
+        let isDirty = true;
+        return;
+    }
+
+    /**
+     * Superpone el recuadro central de PAUSA estrictamente dentro del viewport 3D
+     * (y: 76..134 <= 206), preservando intacto el HUD inferior.
+     */
+    method void renderPauseOverlay() {
+        do Screen.setColor(true);
+        do Screen.drawRectangle(80, 76, 431, 134);
+        do Screen.setColor(false);
+        do Screen.drawRectangle(84, 80, 427, 130);
+        do Screen.setColor(true);
+
+        do Output.moveCursor(9, 15);
+        do Output.printString(sPausePrompt);
+
+        let isDirty = true;
+        return;
+    }
+
+    /**
+     * Superpone el recuadro central de GAME OVER dentro del viewport 3D (y: 54..168 <= 206)
+     * mostrando puntaje final, bajas y record de sesion sin asignar memoria.
+     */
+    method void renderGameOverOverlay(ScoreManager scores) {
+        var int finalScore;
+        var int finalKills;
+        var int finalHigh;
+
+        let finalScore = 0;
+        let finalKills = 0;
+        let finalHigh = 0;
+
+        if (~(scores = null)) {
+            let finalScore = MathUtils.clamp(scores.getScore(), 0, 30000);
+            let finalKills = MathUtils.clamp(scores.getKills(), 0, 30000);
+            let finalHigh = MathUtils.clamp(scores.getHighScore(), 0, 30000);
+        }
+
+        do Screen.setColor(true);
+        do Screen.drawRectangle(64, 54, 447, 168);
+        do Screen.setColor(false);
+        do Screen.drawRectangle(68, 58, 443, 164);
+        do Screen.setColor(true);
+        do Screen.drawLine(84, 86, 427, 86);
+
+        do Output.moveCursor(6, 13);
+        do Output.printString(sGameOverTitle);
+
+        do Output.moveCursor(9, 22);
+        do Output.printString(sScoreLabel);
+        do Output.moveCursor(9, 29);
+        do Output.printInt(finalScore);
+
+        do Output.moveCursor(11, 22);
+        do Output.printString(sKillsLabel);
+        do Output.moveCursor(11, 29);
+        do Output.printInt(finalKills);
+
+        do Output.moveCursor(13, 19);
+        do Output.printString(sHighLabel);
+        do Output.printInt(finalHigh);
+
+        let isDirty = true;
+        return;
+    }
+
+    /**
+     * [Interno] Limpia 5 celdas consecutivas en (row, col) con espacios preasignados
+     * y reposiciona el cursor al inicio del campo para imprimir el nuevo entero.
+     * Acota row a [0..22] y col a [0..57] para impedir Sys.error(20) y saltos println().
+     */
+    method void clearTextField(int row, int col) {
+        var int safeRow;
+        var int safeCol;
+
+        let safeRow = MathUtils.clamp(row, 0, 22);
+        let safeCol = MathUtils.clamp(col, 0, 57);
+
+        do Output.moveCursor(safeRow, safeCol);
+        do Output.printString(sBlank5);
+        do Output.moveCursor(safeRow, safeCol);
+        return;
+    }
+
+    /** Libera simetricamente las 17 cadenas String preasignadas y esta instancia. */
+    method void dispose() {
+        do sBlank5.dispose();
+        do sHpLabel.dispose();
+        do sAmmoLabel.dispose();
+        do sSlashMax.dispose();
+        do sReloadHint.dispose();
+        do sScoreLabel.dispose();
+        do sKillsLabel.dispose();
+        do sStatePlay.dispose();
+        do sStatePause.dispose();
+        do sStateDead.dispose();
+        do sTitle.dispose();
+        do sControls1.dispose();
+        do sControls2.dispose();
+        do sHighLabel.dispose();
+        do sMenuPrompt.dispose();
+        do sPausePrompt.dispose();
+        do sGameOverTitle.dispose();
+
+        do Memory.deAlloc(this);
+        return;
+    }
+}
+

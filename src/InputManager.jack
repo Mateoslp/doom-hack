@@ -1,0 +1,132 @@
+/**
+ * InputManager.jack
+ * Subsistema de captura no bloqueante de teclado (Capa 1).
+ *
+ * Lee exclusivamente Keyboard.keyPressed() (RAM[24576]) en O(1), normaliza
+ * codigos alfabeticos ASCII minuscula (97..122) a mayuscula (65..90) y expone
+ * predicados desacoplados tanto por nivel continuo (movimiento, apuntado y disparo)
+ * como por flanco de subida (inicio, pausa, recarga, reinicio y salida a menu).
+ *
+ * Cero asignaciones dinamicas durante poll().
+ */
+class InputManager {
+
+    field char currentKey;
+    field char prevKey;
+
+    /** Inicializa el subsistema de entrada sin teclas activas. */
+    constructor InputManager new() {
+        let currentKey = 0;
+        let prevKey = 0;
+        return this;
+    }
+
+    /**
+     * [Interno] Normaliza codigos ASCII minuscula 'a'..'z' (97..122) a 'A'..'Z' (65..90).
+     * Si recibe un valor negativo invalido, retorna 0 de forma defensiva.
+     * Los codigos especiales Hack (128..152), espacio (32) y 'A'..'Z' (65..90) se conservan.
+     */
+    function char normalizeKey(char rawKey) {
+        if (rawKey < 0) {
+            return 0;
+        }
+        if ((~(rawKey < 97)) & (~(rawKey > 122))) {
+            return (rawKey - 32);
+        }
+        return rawKey;
+    }
+
+    /**
+     * Muestra el estado actual del teclado de forma no bloqueante.
+     * Debe invocarse una vez por iteracion del bucle principal.
+     */
+    method void poll() {
+        var char raw;
+        let prevKey = currentKey;
+        let raw = Keyboard.keyPressed();
+        let currentKey = InputManager.normalizeKey(raw);
+        return;
+    }
+
+    /** Retorna el codigo normalizado de la tecla activa en el tick actual (0 si ninguna). */
+    method char getCurrentKey() {
+        return currentKey;
+    }
+
+    /** Nivel continuo: 'A' (65) o Flecha Izquierda (130). */
+    method boolean isMoveLeftHeld() {
+        return ((currentKey = GameConstants.keyA()) | (currentKey = GameConstants.keyLeft()));
+    }
+
+    /** Nivel continuo: 'D' (68) o Flecha Derecha (132). */
+    method boolean isMoveRightHeld() {
+        return ((currentKey = GameConstants.keyD()) | (currentKey = GameConstants.keyRight()));
+    }
+
+    /** Nivel continuo: 'W' (87) o Flecha Arriba (131). */
+    method boolean isAimUpHeld() {
+        return ((currentKey = GameConstants.keyW()) | (currentKey = GameConstants.keyUp()));
+    }
+
+    /** Nivel continuo: 'S' (83) o Flecha Abajo (133). */
+    method boolean isAimDownHeld() {
+        return ((currentKey = GameConstants.keyS()) | (currentKey = GameConstants.keyDown()));
+    }
+
+    /** Nivel continuo (sujeto a cooldown del arma en Player): Espacio (32). */
+    method boolean isFireHeld() {
+        return (currentKey = GameConstants.keySpace());
+    }
+
+    /** Flanco de subida para iniciar partida en MENU: Espacio (32) o Enter (128). */
+    method boolean isStartTriggered() {
+        var boolean nowStart;
+        var boolean wasStart;
+
+        let nowStart = ((currentKey = GameConstants.keySpace()) | (currentKey = GameConstants.keyEnter()));
+        let wasStart = ((prevKey = GameConstants.keySpace()) | (prevKey = GameConstants.keyEnter()));
+        return (nowStart & (~wasStart));
+    }
+
+    /** Flanco de subida para alternar pausa en PLAYING/PAUSED: 'P' (80). */
+    method boolean isPauseTriggered() {
+        var char keyP;
+        let keyP = GameConstants.keyP();
+        return ((currentKey = keyP) & (~(prevKey = keyP)));
+    }
+
+    /** Flanco de subida para recargar municion en PLAYING: 'R' (82). */
+    method boolean isReloadTriggered() {
+        var char keyR;
+        let keyR = GameConstants.keyR();
+        return ((currentKey = keyR) & (~(prevKey = keyR)));
+    }
+
+    /** Flanco de subida para reiniciar partida en GAME_OVER: 'R' (82). */
+    method boolean isRestartTriggered() {
+        var char keyR;
+        let keyR = GameConstants.keyR();
+        return ((currentKey = keyR) & (~(prevKey = keyR)));
+    }
+
+    /** Flanco de subida para regresar a MENU desde PAUSED/GAME_OVER: ESC (140). */
+    method boolean isMenuExitTriggered() {
+        var char keyEsc;
+        let keyEsc = GameConstants.keyEsc();
+        return ((currentKey = keyEsc) & (~(prevKey = keyEsc)));
+    }
+
+    /** Limpia el estado actual y previo de teclas almacenadas. */
+    method void clearState() {
+        let currentKey = 0;
+        let prevKey = 0;
+        return;
+    }
+
+    /** Libera las 2 palabras de memoria de esta instancia. */
+    method void dispose() {
+        do Memory.deAlloc(this);
+        return;
+    }
+}
+

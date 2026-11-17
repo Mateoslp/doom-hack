@@ -1,0 +1,261 @@
+/**
+ * CollisionManager.jack
+ * Servicio estatico puro de resolucion de impactos hitscan con oclusion por
+ * profundidad z, lanzamiento dirigido de proyectiles enemigos hacia el jugador
+ * y deteccion de dano al jugador por proyectiles o contacto cuerpo a cuerpo
+ * (Modulo 5 del Plan Modular de Desarrollo / Capa 3 / Ficha Tecnica #12).
+ *
+ * Reglas del GDD y Contratos Congelados:
+ *   1. Hitscan (GDD B.4 y E.2): evalua la mira fija en X = 256 y Y = player.getAimY()
+ *      contra la caja proyectada [leftX - 4, rightX + 4] x [topY - 4, botY + 4]
+ *      de cada enemigo activo. Si varios se solapan, impacta UNICAMENTE al de
+ *      menor profundidad z (oclusion estricta).
+ *   2. Baja y puntaje (Contratos #4 y #5): aplica enemy.takeDamage(1) e invoca
+ *      scores.registerKill(enemy.getType()) exclusivamente cuando retorna true.
+ *   3. Disparo enemigo (Ficha #12 y GDD E.3, F): cuando enemy.isReadyToShoot(),
+ *      calcula vx en Q11.4 apuntando hacia player.getX() (Tipo 1: vz=2, vy=-136,
+ *      dmg=10; Tipo 2: vz=3, vy=-60, dmg=15) y reinicia attackTimer.
+ *   4. Dano al jugador: proyectiles activos en z <= zMelee (14) dentro del ancho
+ *      corporal |worldX - playerX| <= 28 (y worldY >= -56) impactan y se desactivan;
+ *      enemigos activos en z <= zMelee dentro del alcance lateral infligen meleeDamage
+ *      respetando invulnTimer del jugador.
+ *
+ * Clase estatica pura: 0 fields, 0 statics, sin dispose().
+ */
+class CollisionManager {
+
+    /**
+     * Resuelve un disparo hitscan del jugador sobre el eje de mira (256, player.getAimY()).
+     * Retorna true si el disparo impacto a un enemigo activo (el mas cercano en z).
+     */
+    function boolean resolvePlayerShot(Player player, EntityManager entities, ScoreManager scores) {
+        var Array enemies;
+        var int maxE;
+        var int i;
+        var int playerX;
+        var int aimX;
+        var int aimY;
+        var int vpX;
+        var int horizonY;
+        var Enemy e;
+        var Enemy bestEnemy;
+        var int bestZ;
+        var int bestDistX;
+        var int ez;
+        var int screenX;
+        var int screenY;
+        var int halfW;
+        var int halfH;
+        var int leftX;
+        var int rightX;
+        var int topY;
+        var int botY;
+        var int distX;
+        var boolean hitX;
+        var boolean hitY;
+        var boolean killed;
+
+        if ((player = null) | (entities = null)) {
+            return false;
+        }
+        if (~(player.isAlive())) {
+            return false;
+        }
+
+        let enemies = entities.getEnemies();
+        if (enemies = null) {
+            return false;
+        }
+
+        let playerX = player.getX();
+        let aimX = GameConstants.centerX();
+        let aimY = player.getAimY();
+        let vpX = MathUtils.computeVanishingX(playerX);
+        let horizonY = GameConstants.baseHorizonY();
+
+        let bestEnemy = null;
+        let bestZ = 32767;
+        let bestDistX = 32767;
+
+        let maxE = GameConstants.maxEnemies();
+        let i = 0;
+        while (i < maxE) {
+            let e = enemies[i];
+            if (~(e = null)) {
+                if (e.isActive()) {
+                    let ez = e.getZ();
+                    let screenX = MathUtils.projectX(e.getWorldX(), playerX, vpX, ez);
+                    let screenY = MathUtils.projectY(e.getWorldY(), horizonY, ez);
+                    let halfW = MathUtils.projectSize(e.getBaseWidth(), ez);
+                    let halfH = MathUtils.projectSize(e.getBaseHeight(), ez);
+
+                    if (halfW < 4) {
+                        let halfW = 4;
+                    }
+                    if (halfH < 6) {
+                        let halfH = 6;
+                    }
+
+                    // Margen de asistencia geometrica de 4 px (GDD Seccion E.2)
+                    let leftX = ((screenX - halfW) - 4);
+                    let rightX = ((screenX + halfW) + 4);
+                    let topY = ((screenY - halfH) - 4);
+                    let botY = ((screenY + halfH) + 4);
+
+                    let hitX = ((~(aimX < leftX)) & (~(aimX > rightX)));
+                    let hitY = ((~(aimY < topY)) & (~(aimY > botY)));
+
+                    if (hitX & hitY) {
+                        let distX = MathUtils.absDiff(screenX, aimX);
+                        if ((ez < bestZ) | ((ez = bestZ) & (distX < bestDistX))) {
+                            let bestZ = ez;
+                            let bestDistX = distX;
+                            let bestEnemy = e;
+                        }
+                    }
+                }
+            }
+            let i = (i + 1);
+        }
+
+        if (bestEnemy = null) {
+            return false;
+        }
+
+        // Aplicar 1 punto de dano (Contrato #4) y registrar baja solo si murio (Contrato #5)
+        let killed = bestEnemy.takeDamage(1);
+        if (killed) {
+            if (~(scores = null)) {
+                do scores.registerKill(bestEnemy.getType());
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Procesa las interacciones del mundo hacia el jugador en el tick actual:
+     *   1. Enemigos listos para disparar lanzan proyectiles balisticos hacia player.getX().
+     *   2. Enemigos en el plano frontal (z <= zMelee) dentro de alcance lateral infligen dano melee.
+     *   3. Proyectiles activos en el plano frontal (z <= zMelee) que impactan al jugador
+     *      infligen su dano y se desactivan inmediatamente.
+     * Retorna true si la salud del jugador cambio efectivamente (para sincronizar HUD).
+     */
+    function boolean resolveWorldInteractions(Player player, EntityManager entities) {
+        var Array enemies;
+        var Array projectiles;
+        var int maxE;
+        var int maxP;
+        var int i;
+        var int playerX;
+        var int meleeZ;
+        var boolean damaged;
+        var Enemy e;
+        var Projectile p;
+        var int ez;
+        var int ex;
+        var int eType;
+        var int projVz;
+        var int projVy;
+        var int projDmg;
+        var int cooldown;
+        var int flightTicks;
+        var int dxFp;
+        var int projVx;
+        var int meleeReach;
+        var boolean spawned;
+
+        if ((player = null) | (entities = null)) {
+            return false;
+        }
+        if (~(player.isAlive())) {
+            return false;
+        }
+
+        let playerX = player.getX();
+        let meleeZ = GameConstants.zMelee();
+        let damaged = false;
+
+        // 1. Interacciones de enemigos: lanzamiento balistico y combate cuerpo a cuerpo
+        let enemies = entities.getEnemies();
+        if (~(enemies = null)) {
+            let maxE = GameConstants.maxEnemies();
+            let i = 0;
+            while (i < maxE) {
+                let e = enemies[i];
+                if (~(e = null)) {
+                    if (e.isActive()) {
+                        let ez = e.getZ();
+                        let ex = e.getWorldX();
+
+                        if (e.isReadyToShoot()) {
+                            let eType = e.getType();
+                            if (eType = 2) {
+                                let projVz = 3;
+                                let projVy = -60;
+                                let projDmg = 15;
+                                let cooldown = 44;
+                            } else {
+                                let projVz = 2;
+                                let projVy = -136;
+                                let projDmg = 10;
+                                let cooldown = 36;
+                            }
+
+                            let flightTicks = ((ez - meleeZ) / projVz);
+                            if (flightTicks < 1) {
+                                let flightTicks = 1;
+                            }
+
+                            // |playerX - ex| <= 320 => |dxFp| <= 5120 << 32767 (sin overflow)
+                            let dxFp = ((playerX - ex) * GameConstants.fpScale());
+                            let projVx = MathUtils.clamp((dxFp / flightTicks), -160, 160);
+
+                            let spawned = entities.spawnProjectile(ex, e.getWorldY(), ez, projVx, projVy, projVz, projDmg);
+                            if (spawned) {
+                                do e.resetAttackTimer(cooldown);
+                            } else {
+                                do e.resetAttackTimer(6);
+                            }
+                        } else {
+                            if (~(ez > meleeZ)) {
+                                let meleeReach = (e.getBaseWidth() + 38);
+                                if (~(MathUtils.absDiff(ex, playerX) > meleeReach)) {
+                                    if (player.takeDamage(e.getMeleeDamage())) {
+                                        let damaged = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                let i = (i + 1);
+            }
+        }
+
+        // 2. Impactos de proyectiles balisticos en el plano frontal del jugador (z <= zMelee)
+        let projectiles = entities.getProjectiles();
+        if (~(projectiles = null)) {
+            let maxP = GameConstants.maxProjectiles();
+            let i = 0;
+            while (i < maxP) {
+                let p = projectiles[i];
+                if (~(p = null)) {
+                    if (p.isActive()) {
+                        if (~(p.getZ() > meleeZ)) {
+                            if ((~(MathUtils.absDiff(p.getWorldX(), playerX) > 28)) & (~(p.getWorldY() < -56))) {
+                                if (player.takeDamage(p.getDamage())) {
+                                    let damaged = true;
+                                }
+                                do p.deactivate();
+                            }
+                        }
+                    }
+                }
+                let i = (i + 1);
+            }
+        }
+
+        return damaged;
+    }
+}
+

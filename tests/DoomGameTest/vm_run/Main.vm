@@ -1,0 +1,1109 @@
+function Main.b2i 0
+push argument 0
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 1
+return
+label IF_FALSE0
+push constant 0
+return
+function Main.nonZero 0
+push argument 0
+push constant 0
+eq
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 1
+return
+label IF_FALSE0
+push constant 0
+return
+function Main.check 4
+push constant 8000
+call Memory.peek 1
+push constant 1
+add
+pop local 0
+push constant 8000
+push local 0
+call Memory.poke 2
+pop temp 0
+push argument 1
+push argument 2
+eq
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 8001
+call Memory.peek 1
+push constant 1
+add
+pop local 1
+push constant 8001
+push local 1
+call Memory.poke 2
+pop temp 0
+goto IF_END0
+label IF_FALSE0
+push constant 8002
+call Memory.peek 1
+push constant 1
+add
+pop local 2
+push constant 8002
+push local 2
+call Memory.poke 2
+pop temp 0
+push constant 8003
+call Memory.peek 1
+pop local 3
+push local 3
+push constant 0
+eq
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push constant 8003
+push argument 0
+call Memory.poke 2
+pop temp 0
+label IF_FALSE1
+label IF_END0
+push constant 0
+return
+function Main.main 26
+push constant 8000
+pop local 14
+label WHILE_EXP0
+push local 14
+push constant 8012
+lt
+not
+if-goto WHILE_END0
+push local 14
+push constant 0
+call Memory.poke 2
+pop temp 0
+push local 14
+push constant 1
+add
+pop local 14
+goto WHILE_EXP0
+label WHILE_END0
+push constant 24576
+push constant 0
+call Memory.poke 2
+pop temp 0
+call DoomGame.new 0
+pop local 0
+push constant 2049
+call Memory.peek 1
+pop local 17
+push local 0
+pop local 2
+push constant 3
+push local 2
+add
+pop pointer 1
+push that 0
+pop local 5
+push constant 4
+push local 2
+add
+pop pointer 1
+push that 0
+pop local 6
+push constant 5
+push local 2
+add
+pop pointer 1
+push that 0
+pop local 7
+push constant 6
+push local 2
+add
+pop pointer 1
+push that 0
+pop local 8
+push constant 7
+push local 2
+add
+pop pointer 1
+push that 0
+pop local 9
+push local 7
+pop local 3
+push local 9
+pop local 4
+push local 7
+call EntityManager.getEnemies 1
+pop local 10
+push local 7
+call EntityManager.getProjectiles 1
+pop local 11
+push constant 0
+push local 10
+add
+pop pointer 1
+push that 0
+pop local 12
+push constant 0
+push local 11
+add
+pop pointer 1
+push that 0
+pop local 13
+push constant 1
+push constant 0
+push local 2
+add
+pop pointer 1
+push that 0
+push constant 10
+call Math.multiply 2
+push constant 1
+push local 2
+add
+pop pointer 1
+push that 0
+call Main.nonZero 1
+add
+push constant 0
+call Main.check 3
+pop temp 0
+push constant 0
+pop local 15
+push constant 2
+pop local 14
+label WHILE_EXP1
+push local 14
+push constant 9
+lt
+not
+if-goto WHILE_END1
+push local 15
+push local 14
+push local 2
+add
+pop pointer 1
+push that 0
+call Main.nonZero 1
+add
+pop local 15
+push local 14
+push constant 1
+add
+pop local 14
+goto WHILE_EXP1
+label WHILE_END1
+push constant 2
+push local 15
+push constant 7
+call Main.check 3
+pop temp 0
+push constant 16770
+call Memory.peek 1
+pop local 21
+push constant 3
+push local 21
+push constant 1
+neg
+eq
+call Main.b2i 1
+push constant 10
+call Math.multiply 2
+push constant 1
+push local 4
+add
+pop pointer 1
+push that 0
+call Main.nonZero 1
+add
+push constant 10
+call Main.check 3
+pop temp 0
+push constant 3
+push local 3
+add
+pop pointer 1
+push that 0
+pop local 16
+push local 0
+call DoomGame.updateMenu 1
+pop temp 0
+push constant 4
+push constant 0
+push local 2
+add
+pop pointer 1
+push that 0
+push constant 1000
+call Math.multiply 2
+push constant 3
+push local 3
+add
+pop pointer 1
+push that 0
+push local 16
+sub
+add
+push constant 37
+call Main.check 3
+pop temp 0
+push constant 24576
+push constant 65
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updateMenu 1
+pop temp 0
+push constant 24576
+push constant 87
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updateMenu 1
+pop temp 0
+push constant 24576
+push constant 82
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updateMenu 1
+pop temp 0
+push constant 24576
+push constant 80
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updateMenu 1
+pop temp 0
+push constant 24576
+push constant 140
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updateMenu 1
+pop temp 0
+push constant 5
+push constant 0
+push local 2
+add
+pop pointer 1
+push that 0
+call GameState.menu 0
+call Main.check 3
+pop temp 0
+push constant 6
+push local 5
+call Player.getX 1
+push local 5
+call Player.getAimY 1
+add
+push local 5
+call Player.getHealth 1
+add
+push local 5
+call Player.getAmmo 1
+add
+push local 8
+call WorldRenderer.getScrollPhase 1
+add
+push local 7
+call EntityManager.getActiveEnemyCount 1
+add
+push constant 228
+call Main.check 3
+pop temp 0
+push constant 24576
+push constant 128
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updateMenu 1
+pop temp 0
+push constant 7
+push constant 0
+push local 2
+add
+pop pointer 1
+push that 0
+push constant 100
+call Math.multiply 2
+push constant 23008
+call Memory.peek 1
+push constant 1
+neg
+eq
+call Main.b2i 1
+push constant 10
+call Math.multiply 2
+add
+push constant 1
+push local 4
+add
+pop pointer 1
+push that 0
+call Main.nonZero 1
+add
+push constant 0
+push local 4
+add
+pop pointer 1
+push that 0
+call Main.nonZero 1
+add
+push constant 111
+call Main.check 3
+pop temp 0
+push constant 8
+push local 5
+call Player.getHealth 1
+push constant 100
+call Math.multiply 2
+push local 5
+call Player.getAmmo 1
+add
+push local 6
+call ScoreManager.getScore 1
+add
+push local 7
+call EntityManager.getActiveEnemyCount 1
+add
+push constant 10024
+call Main.check 3
+pop temp 0
+push local 7
+push constant 1
+push constant 0
+push constant 44
+push constant 0
+call EntityManager.spawnEnemy 5
+pop temp 0
+push constant 24576
+push constant 32
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updatePlaying 1
+pop temp 0
+push constant 9
+push local 5
+call Player.getAmmo 1
+push constant 100
+call Math.multiply 2
+push local 12
+call Enemy.getHp 1
+push constant 10
+call Math.multiply 2
+add
+push local 8
+call WorldRenderer.getScrollPhase 1
+add
+push constant 2312
+call Main.check 3
+pop temp 0
+push local 0
+call DoomGame.updatePlaying 1
+pop temp 0
+push constant 10
+push local 5
+call Player.getAmmo 1
+push constant 100
+call Math.multiply 2
+push local 12
+call Enemy.getHp 1
+push constant 10
+call Math.multiply 2
+add
+push local 5
+call Player.getRecoilOffset 1
+add
+push constant 2314
+call Main.check 3
+pop temp 0
+push constant 24576
+push constant 97
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updatePlaying 1
+pop temp 0
+push constant 11
+push local 5
+call Player.getX 1
+push constant 12
+neg
+call Main.check 3
+pop temp 0
+push constant 24576
+push constant 87
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updatePlaying 1
+pop temp 0
+push constant 12
+push local 5
+call Player.getAimY 1
+push constant 100
+call Math.multiply 2
+push local 8
+call WorldRenderer.getScrollPhase 1
+add
+push constant 10008
+call Main.check 3
+pop temp 0
+push constant 24576
+push constant 132
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updatePlaying 1
+pop temp 0
+push constant 13
+push local 5
+call Player.getX 1
+push constant 10
+call Math.multiply 2
+push local 8
+call WorldRenderer.getScrollPhase 1
+add
+push constant 10
+call Main.check 3
+pop temp 0
+push constant 24576
+push constant 115
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updatePlaying 1
+pop temp 0
+push constant 14
+push local 5
+call Player.getAimY 1
+push constant 104
+call Main.check 3
+pop temp 0
+push constant 24576
+push constant 32
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updatePlaying 1
+pop temp 0
+push local 6
+call ScoreManager.getKills 1
+pop local 20
+push local 6
+call ScoreManager.getHighScore 1
+pop local 19
+push constant 15
+push local 6
+call ScoreManager.getScore 1
+push constant 10
+call Math.multiply 2
+push local 20
+add
+push constant 1001
+call Main.check 3
+pop temp 0
+push constant 16
+push local 19
+push constant 10
+call Math.multiply 2
+push local 5
+call Player.getAmmo 1
+add
+push constant 1022
+call Main.check 3
+pop temp 0
+push constant 17
+push local 7
+call EntityManager.getActiveEnemyCount 1
+push constant 1000
+call Math.multiply 2
+push local 12
+call Enemy.getZ 1
+add
+push constant 1100
+call Main.check 3
+pop temp 0
+push constant 24576
+push constant 82
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updatePlaying 1
+pop temp 0
+push constant 23008
+call Memory.peek 1
+pop local 25
+push constant 18
+push local 5
+call Player.getAmmo 1
+push constant 10
+call Math.multiply 2
+push local 8
+call WorldRenderer.getScrollPhase 1
+add
+push constant 240
+call Main.check 3
+pop temp 0
+push constant 19
+push local 25
+push constant 1
+neg
+call Main.check 3
+pop temp 0
+push local 7
+push constant 0
+push constant 0
+push constant 50
+push constant 16
+push constant 0
+push constant 2
+push constant 10
+call EntityManager.spawnProjectile 8
+pop temp 0
+push constant 24576
+push constant 80
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updatePlaying 1
+pop temp 0
+push constant 20
+push constant 0
+push local 2
+add
+pop pointer 1
+push that 0
+push constant 1000
+call Math.multiply 2
+push local 8
+call WorldRenderer.getScrollPhase 1
+add
+push local 12
+call Enemy.getZ 1
+add
+push local 13
+call Projectile.getZ 1
+add
+push constant 2148
+call Main.check 3
+pop temp 0
+push constant 18886
+call Memory.peek 1
+pop local 22
+push constant 21
+push local 22
+push constant 1
+neg
+call Main.check 3
+pop temp 0
+push local 0
+call DoomGame.updatePaused 1
+pop temp 0
+push constant 22
+push constant 0
+push local 2
+add
+pop pointer 1
+push that 0
+call GameState.paused 0
+call Main.check 3
+pop temp 0
+push constant 24576
+push constant 65
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updatePaused 1
+pop temp 0
+push constant 24576
+push constant 87
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updatePaused 1
+pop temp 0
+push constant 24576
+push constant 32
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updatePaused 1
+pop temp 0
+push constant 24576
+push constant 82
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updatePaused 1
+pop temp 0
+push constant 23
+push local 5
+call Player.getX 1
+push local 5
+call Player.getAimY 1
+add
+push local 5
+call Player.getAmmo 1
+add
+push local 5
+call Player.getHealth 1
+add
+push constant 228
+call Main.check 3
+pop temp 0
+push constant 24
+push local 8
+call WorldRenderer.getScrollPhase 1
+push local 12
+call Enemy.getZ 1
+add
+push local 13
+call Projectile.getZ 1
+add
+push local 13
+call Projectile.getFpY 1
+add
+push local 13
+call Projectile.getVy 1
+add
+push constant 148
+call Main.check 3
+pop temp 0
+push constant 24576
+push constant 0
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updatePaused 1
+pop temp 0
+push constant 24576
+push constant 80
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updatePaused 1
+pop temp 0
+push constant 18886
+call Memory.peek 1
+pop local 23
+push constant 25
+push constant 0
+push local 2
+add
+pop pointer 1
+push that 0
+push constant 10
+call Math.multiply 2
+push local 23
+call Main.nonZero 1
+add
+push constant 10
+call Main.check 3
+pop temp 0
+push constant 24576
+push constant 0
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updatePlaying 1
+pop temp 0
+push constant 26
+push local 8
+call WorldRenderer.getScrollPhase 1
+push constant 1000
+call Math.multiply 2
+push local 13
+call Projectile.getZ 1
+push constant 10
+call Math.multiply 2
+add
+push local 13
+call Projectile.getVy 1
+add
+push constant 2492
+call Main.check 3
+pop temp 0
+push constant 24576
+push constant 80
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updatePlaying 1
+pop temp 0
+push constant 24576
+push constant 140
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updatePaused 1
+pop temp 0
+push constant 27
+push constant 0
+push local 2
+add
+pop pointer 1
+push that 0
+push constant 1000
+call Math.multiply 2
+push local 6
+call ScoreManager.getHighScore 1
+add
+push constant 100
+call Main.check 3
+pop temp 0
+push constant 28
+push constant 16770
+call Memory.peek 1
+push constant 1
+neg
+call Main.check 3
+pop temp 0
+push constant 24576
+push constant 32
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updateMenu 1
+pop temp 0
+push constant 29
+push constant 0
+push local 2
+add
+pop pointer 1
+push that 0
+push constant 1000
+call Math.multiply 2
+push local 6
+call ScoreManager.getHighScore 1
+add
+push local 6
+call ScoreManager.getScore 1
+add
+push local 7
+call EntityManager.getActiveEnemyCount 1
+add
+push constant 1100
+call Main.check 3
+pop temp 0
+push constant 24576
+push constant 0
+call Memory.poke 2
+pop temp 0
+push local 5
+push constant 85
+call Player.takeDamage 2
+pop temp 0
+push constant 0
+pop local 14
+label WHILE_EXP2
+push local 14
+push constant 8
+lt
+not
+if-goto WHILE_END2
+push local 5
+call Player.updateTimers 1
+pop temp 0
+push local 14
+push constant 1
+add
+pop local 14
+goto WHILE_EXP2
+label WHILE_END2
+push local 7
+push constant 2
+push constant 0
+push constant 15
+push constant 0
+call EntityManager.spawnEnemy 5
+pop temp 0
+push local 0
+call DoomGame.updatePlaying 1
+pop temp 0
+push constant 18149
+call Memory.peek 1
+pop local 24
+push constant 30
+push constant 0
+push local 2
+add
+pop pointer 1
+push that 0
+push constant 100
+call Math.multiply 2
+push local 5
+call Player.getHealth 1
+push constant 10
+call Math.multiply 2
+add
+push local 5
+call Player.isAlive 1
+call Main.b2i 1
+add
+push constant 300
+call Main.check 3
+pop temp 0
+push constant 31
+push local 24
+push constant 1
+neg
+call Main.check 3
+pop temp 0
+push constant 24576
+push constant 65
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updateGameOver 1
+pop temp 0
+push constant 24576
+push constant 32
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updateGameOver 1
+pop temp 0
+push constant 24576
+push constant 80
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updateGameOver 1
+pop temp 0
+push constant 32
+push constant 0
+push local 2
+add
+pop pointer 1
+push that 0
+push constant 1000
+call Math.multiply 2
+push local 8
+call WorldRenderer.getScrollPhase 1
+push constant 100
+call Math.multiply 2
+add
+push local 5
+call Player.getAmmo 1
+add
+push local 5
+call Player.getX 1
+add
+push constant 3224
+call Main.check 3
+pop temp 0
+push constant 24576
+push constant 82
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updateGameOver 1
+pop temp 0
+push constant 33
+push constant 0
+push local 2
+add
+pop pointer 1
+push that 0
+push constant 1000
+call Math.multiply 2
+push local 5
+call Player.getHealth 1
+add
+push local 5
+call Player.getAmmo 1
+add
+push local 7
+call EntityManager.getActiveEnemyCount 1
+add
+push constant 1124
+call Main.check 3
+pop temp 0
+push local 0
+call DoomGame.updatePlaying 1
+pop temp 0
+push constant 34
+push constant 0
+push local 2
+add
+pop pointer 1
+push that 0
+push constant 1000
+call Math.multiply 2
+push local 5
+call Player.getAmmo 1
+push constant 10
+call Math.multiply 2
+add
+push local 8
+call WorldRenderer.getScrollPhase 1
+add
+push constant 1242
+call Main.check 3
+pop temp 0
+push constant 24576
+push constant 0
+call Memory.poke 2
+pop temp 0
+push local 7
+push constant 0
+push constant 0
+push constant 16
+push constant 0
+push constant 0
+push constant 3
+push constant 100
+call EntityManager.spawnProjectile 8
+pop temp 0
+push local 0
+call DoomGame.updatePlaying 1
+pop temp 0
+push constant 35
+push constant 0
+push local 2
+add
+pop pointer 1
+push that 0
+push constant 10
+call Math.multiply 2
+push local 5
+call Player.getHealth 1
+add
+push constant 30
+call Main.check 3
+pop temp 0
+push constant 24576
+push constant 140
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.updateGameOver 1
+pop temp 0
+push constant 36
+push constant 0
+push local 2
+add
+pop pointer 1
+push that 0
+push constant 1000
+call Math.multiply 2
+push local 6
+call ScoreManager.getHighScore 1
+add
+push constant 100
+call Main.check 3
+pop temp 0
+push local 0
+call DoomGame.startNewMatch 1
+pop temp 0
+push local 0
+call DoomGame.startNewMatch 1
+pop temp 0
+push constant 37
+push constant 0
+push local 2
+add
+pop pointer 1
+push that 0
+push constant 1000
+call Math.multiply 2
+push local 5
+call Player.getHealth 1
+add
+push local 6
+call ScoreManager.getHighScore 1
+add
+push constant 1200
+call Main.check 3
+pop temp 0
+push constant 1
+push local 2
+add
+push constant 0
+not
+pop temp 0
+pop pointer 1
+push temp 0
+pop that 0
+push local 0
+call DoomGame.run 1
+pop temp 0
+push constant 38
+push constant 0
+push local 2
+add
+pop pointer 1
+push that 0
+call GameState.playing 0
+call Main.check 3
+pop temp 0
+push constant 2049
+call Memory.peek 1
+push local 17
+sub
+pop local 18
+push constant 39
+push local 18
+push constant 0
+call Main.check 3
+pop temp 0
+push constant 24576
+push constant 0
+call Memory.poke 2
+pop temp 0
+push local 0
+call DoomGame.dispose 1
+pop temp 0
+call DoomGame.new 0
+pop local 1
+push local 1
+call DoomGame.dispose 1
+pop temp 0
+push constant 40
+push constant 1
+push constant 1
+call Main.check 3
+pop temp 0
+push constant 8004
+push local 19
+call Memory.poke 2
+pop temp 0
+push constant 8005
+push local 20
+call Memory.poke 2
+pop temp 0
+push constant 8006
+push local 21
+call Memory.poke 2
+pop temp 0
+push constant 8007
+push local 22
+call Memory.poke 2
+pop temp 0
+push constant 8008
+push local 23
+call Memory.poke 2
+pop temp 0
+push constant 8009
+push local 24
+call Memory.poke 2
+pop temp 0
+push constant 8010
+push local 25
+call Memory.poke 2
+pop temp 0
+push constant 8011
+push local 18
+call Memory.poke 2
+pop temp 0
+push constant 0
+return

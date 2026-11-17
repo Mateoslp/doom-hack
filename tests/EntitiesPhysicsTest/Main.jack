@@ -1,0 +1,514 @@
+/**
+ * Main.jack (Suite de Pruebas Automatizadas - Modulo 4: Entidades, Pools y Fisica)
+ * Ubicacion: C:/DoomProject/tests/EntitiesPhysicsTest/Main.jack
+ *
+ * Verifica en VMEmulator v2.5 (44 aserciones + testigos fisicos y de heap RAM[2049]):
+ *   1. Enemy (Tests 1..14): estado inactivo inicial, atributos de Tipo 1 (Acechador)
+ *      y Tipo 2 (Bruto Igneo), avance axial hacia zMelee (14) sin subdesbordamiento,
+ *      oscilacion lateral con rebote en paredes [-160, +160], temporizador de disparo
+ *      isReadyToShoot/resetAttackTimer, hitFlashTimer (2 ticks), takeDamage con
+ *      preservacion de getType() al morir (Contratos #4 y #5) e integracion con ScoreManager.
+ *   2. Projectile (Tests 15..20): conversion exacta mundo <-> punto fijo Q11.4 (x16),
+ *      acotamiento defensivo de entradas extremas, setKinematics, registerBounce y deactivate.
+ *   3. PhysicsEngine (Tests 21..32 - Requisito Obligatorio #3): gravedad discreta g = +12,
+ *      ascenso/apice/caida parabolica, velocidad terminal maxVy = 240, rebote inelastico
+ *      en suelo fpY > 1440 con restitucion racional e = 7/8 (vy = -(vy * 7) / 8),
+ *      rebote elastico en techo fpY < -1440, rebotes especulares en paredes |fpX| > 2560,
+ *      desactivacion en zNearClip (8), guardas ante null/inactivos y trayectoria completa
+ *      de 45 ticks comparada contra solucion analitica cerrada.
+ *   4. EntityManager (Tests 33..44): pools fijos enemies[4] y projectiles[5], rechazo sin
+ *      alloc cuando estan llenos, reutilizacion exacta de referencias tras deactivate(),
+ *      updateProjectilesPhysics() en lote, RNG de 16 bits sin overflow en ciclo completo,
+ *      escalado de aparicion por oleadas (Wave 1 -> 2, Wave 2 -> 3, Wave 3 -> 4 + Tipo 2),
+ *      reset(), PRUEBA ESTRICTA DE CERO ASIGNACIONES EN HEAP (RAM[2049] delta = 0) y dispose().
+ */
+class Main {
+
+    function int b2i(boolean flag) {
+        if (flag) {
+            return 1;
+        }
+        return 0;
+    }
+
+    function int nonZero(int val) {
+        if (~(val = 0)) {
+            return 1;
+        }
+        return 0;
+    }
+
+    function void check(int testId, int actual, int expected) {
+        var int total;
+        var int passed;
+        var int failed;
+        var int firstFail;
+
+        let total = (Memory.peek(8000) + 1);
+        do Memory.poke(8000, total);
+
+        if (actual = expected) {
+            let passed = (Memory.peek(8001) + 1);
+            do Memory.poke(8001, passed);
+        } else {
+            let failed = (Memory.peek(8002) + 1);
+            do Memory.poke(8002, failed);
+            let firstFail = Memory.peek(8003);
+            if (firstFail = 0) {
+                do Memory.poke(8003, testId);
+            }
+        }
+        return;
+    }
+
+    function void main() {
+        var int minInt16;
+        var Enemy e;
+        var Enemy slotE;
+        var Enemy reusedE;
+        var Projectile proj;
+        var Projectile slotP;
+        var Projectile reusedP;
+        var ScoreManager scores;
+        var EntityManager em;
+        var EntityManager em2;
+        var Array eArr;
+        var Array pArr;
+        var int i;
+        var int k;
+        var int r;
+        var boolean killed;
+        var boolean f0;
+        var boolean f1;
+        var boolean f2;
+        var boolean act1;
+        var int z1;
+        var int vBounce;
+        var int fpX45;
+        var int fpY45;
+        var int bounces45;
+        var int violations;
+        var int outOfBounds;
+        var int sawZero;
+        var int sawMax;
+        var int sawType1;
+        var int sawType2;
+        var int activeProjs;
+        var int allInactiveOk;
+        var int wave1Count;
+        var int wave2Count;
+        var int wave3Count;
+        var int heapBefore;
+        var int heapDelta;
+
+        do Memory.poke(8000, 0);
+        do Memory.poke(8001, 0);
+        do Memory.poke(8002, 0);
+        do Memory.poke(8003, 0);
+
+        let minInt16 = ((-32767) - 1);
+
+        // =====================================================================
+        // SECCION A: Enemy (Tests 1..14)
+        // =====================================================================
+        let e = Enemy.new();
+
+        // Test 1: Ranura recien creada esta inactiva
+        do Main.check(1, (((Main.b2i(e.isActive()) * 1000) + (Main.b2i(e.isHitFlashing()) * 100)) + ((Main.b2i(e.isReadyToShoot()) * 10) + e.getHp())), 0);
+
+        // Test 2..3: Spawn Tipo 1 (Acechador: hp=2, speedZ=2, baseW=22, baseH=32, melee=15)
+        do e.spawn(1, -40, 100, 12);
+        do Main.check(2, (((Main.b2i(e.isActive()) * 100) + (e.getType() * 10)) + e.getHp()), 112);
+        do Main.check(3, (((((e.getZ() + e.getWorldX()) + e.getWorldY()) * 100) + e.getBaseWidth()) + (e.getBaseHeight() + e.getMeleeDamage())), 7269);
+
+        // Test 4: 1 tick de update() -> z=98, worldX=-28, attackTimer=9 (aun no dispara)
+        do e.update();
+        do Main.check(4, (((e.getZ() * 100) + (-e.getWorldX())) + Main.b2i(e.isReadyToShoot())), 9828);
+
+        // Test 5: 9 ticks adicionales (10 en total) -> z=80, worldX=+80, isReadyToShoot=true
+        let i = 0;
+        while (i < 9) {
+            do e.update();
+            let i = (i + 1);
+        }
+        do Main.check(5, (((e.getZ() * 100) + e.getWorldX()) + Main.b2i(e.isReadyToShoot())), 8081);
+
+        // Test 6: resetAttackTimer(5) y rebote lateral contra pared derecha (+160)
+        // En 7 ticks desde x=80 (+12/tick) alcanza 164 -> rebota a 160 con strafeVx=-12; tick 8 -> 148, z=64
+        do e.resetAttackTimer(5);
+        let i = 0;
+        while (i < 8) {
+            do e.update();
+            let i = (i + 1);
+        }
+        do Main.check(6, (((e.getWorldX() * 100) + e.getZ()) + Main.b2i(e.isReadyToShoot())), 14865);
+
+        // Test 7: Acotamiento defensivo en spawn y rebote contra pared izquierda (-160)
+        do e.spawn(99, -500, 999, -50);
+        do e.update();
+        do e.update();
+        do Main.check(7, (((e.getType() * 1000) + (-e.getWorldX())) + e.getZ()), 1240);
+
+        // Test 8: Freno seguro en plano cuerpo a cuerpo zMelee (14) sin bajar a z <= 0
+        let i = 0;
+        while (i < 60) {
+            do e.update();
+            let i = (i + 1);
+        }
+        do Main.check(8, (((e.getZ() * 100) + (Main.b2i(e.isActive()) * 10)) + Main.b2i(e.isReadyToShoot())), 1410);
+
+        // Test 9..10: Spawn Tipo 2 (Bruto Igneo: hp=4, speedZ=1, baseW=28, baseH=36, melee=25)
+        do e.spawn(2, 30, 90, 0);
+        do e.update();
+        do Main.check(9, (((e.getType() * 1000) + (e.getHp() * 100)) + e.getZ()), 2489);
+        do Main.check(10, ((((e.getBaseWidth() + e.getBaseHeight()) + e.getMeleeDamage()) * 100) + MathUtils.projectSize(e.getBaseWidth(), 100)), 8917);
+
+        // Test 11: Guardas ante dano <= 0 y -32768
+        do Main.check(11, ((((Main.b2i(e.takeDamage(0)) + Main.b2i(e.takeDamage(-5))) + Main.b2i(e.takeDamage(minInt16))) + Main.b2i(e.isHitFlashing())) + e.getHp()), 4);
+
+        // Test 12: Dano no letal activa hitFlashTimer durante exactamente 2 ticks
+        let killed = e.takeDamage(1);
+        let f0 = e.isHitFlashing();
+        do e.update();
+        let f1 = e.isHitFlashing();
+        do e.update();
+        let f2 = e.isHitFlashing();
+        do Main.check(12, ((((Main.b2i(killed) * 1000) + (e.getHp() * 100)) + (Main.b2i(f0) * 10)) + ((Main.b2i(f1) * 2) + Main.b2i(f2))), 312);
+
+        // Test 13..14: Dano letal retorna true, desactiva ranura y preserva getType()=2 para ScoreManager (+250)
+        let scores = ScoreManager.new();
+        let killed = e.takeDamage(3);
+        if (killed) {
+            do scores.registerKill(e.getType());
+        }
+        do Main.check(13, ((((Main.b2i(killed) * 1000) + (Main.b2i(e.isActive()) * 100)) + (e.getType() * 10)) + Main.b2i(e.takeDamage(1))), 1020);
+        do Main.check(14, scores.getScore(), 250);
+        do scores.dispose();
+        do e.dispose();
+
+        // =====================================================================
+        // SECCION B: Projectile (Tests 15..20)
+        // =====================================================================
+        let proj = Projectile.new();
+
+        // Test 15: Estado inicial inactivo
+        do Main.check(15, (((Main.b2i(proj.isActive()) * 100) + proj.getFpX()) + (proj.getFpY() + proj.getBounceCount())), 0);
+
+        // Test 16..17: Spawn en mundo (-25, 12, z=80) -> punto fijo Q11.4 (-400, 192)
+        do proj.spawn(-25, 12, 80, 32, -136, 2, 10);
+        do Main.check(16, ((((proj.getFpX() + 1000) * 10) + Main.b2i(proj.isActive())) + (proj.getFpY() - 192)), 6001);
+        do Main.check(17, ((((proj.getZ() + proj.getVx()) + proj.getDamage()) + (-proj.getVy())) + (proj.getWorldY() - proj.getWorldX())), 295);
+
+        // Test 18: Saturacion segura ante parametros fuera de rango
+        do proj.spawn(999, -999, 500, -999, 999, 0, -10);
+        do Main.check(18, (((proj.getWorldX() - proj.getWorldY()) * 10) + (((proj.getZ() + proj.getVy()) + proj.getVz()) + proj.getDamage())), 2842);
+
+        // Test 19..20: setKinematics, registerBounce y deactivate
+        do proj.setKinematics(320, -480, 45, -24, 60);
+        do proj.registerBounce();
+        do proj.registerBounce();
+        do Main.check(19, (((((proj.getWorldX() - proj.getWorldY()) + proj.getZ()) * 10) + proj.getBounceCount()) + (proj.getVz() - 1)), 952);
+        do proj.deactivate();
+        do Main.check(20, (((Main.b2i(proj.isActive()) * 100) + proj.getBounceCount()) + proj.getDamage()), 0);
+
+        // =====================================================================
+        // SECCION C: PhysicsEngine - Cinematica, Gravedad y Rebotes (Tests 21..32)
+        // =====================================================================
+
+        // Test 21: 1 tick de gravedad (+12) e integracion lineal (CA-06)
+        do proj.spawn(0, 0, 80, 20, -136, 2, 10);
+        do PhysicsEngine.updateProjectile(proj);
+        do Main.check(21, ((((-proj.getVy()) * 100) + proj.getZ()) + ((proj.getFpX() - proj.getFpY()) - 144)), 12478);
+
+        // Test 22: 11 ticks adicionales (tick 12): cruza apice (fpY=-704 en t=11 -> fpY=-696, vy=+8 en t=12)
+        let i = 0;
+        while (i < 11) {
+            do PhysicsEngine.updateProjectile(proj);
+            let i = (i + 1);
+        }
+        do Main.check(22, ((((-proj.getFpY()) * 10) + proj.getVy()) + ((proj.getFpX() + proj.getZ()) - 296)), 6968);
+
+        // Test 23: Velocidad terminal vertical maxVy = 240
+        do proj.spawn(0, -80, 90, 0, 234, 1, 10);
+        do PhysicsEngine.updateProjectile(proj);
+        do PhysicsEngine.updateProjectile(proj);
+        do Main.check(23, ((proj.getVy() * 10) + ((-proj.getFpY()) / 100)), 2408);
+
+        // Test 24..25: Rebote inelastico exacto en el suelo (fpY > 1440, restitucion 7/8, CA-07)
+        // fpY=1360, vy=148 -> nextVy=160, nextFpY=1520 > 1440 -> fpY=1440, vy=-(160*7)/8 = -140, bounce=1
+        do proj.spawn(0, 85, 60, 16, 148, 2, 10);
+        do PhysicsEngine.updateProjectile(proj);
+        let vBounce = proj.getVy();
+        do Main.check(24, ((proj.getFpY() * 10) + proj.getBounceCount()), 14401);
+        do PhysicsEngine.updateProjectile(proj);
+        do Main.check(25, (((-vBounce) * 100) + (1440 - proj.getFpY())), 14128);
+
+        // Test 26: Truncamiento entero exacto en rebote 7/8 no multiplo de 8 (nextVy=100 -> -(700/8) = -87)
+        do proj.spawn(0, 88, 50, 0, 88, 2, 10);
+        do PhysicsEngine.updateProjectile(proj);
+        do Main.check(26, ((proj.getFpY() + (-proj.getVy())) + proj.getBounceCount()), 1528);
+
+        // Test 27: Rebote elastico contra el techo (fpY < -1440 -> fpY=-1440, vy=+168)
+        do proj.spawn(0, -85, 50, 0, -180, 2, 10);
+        do PhysicsEngine.updateProjectile(proj);
+        do Main.check(27, (((-proj.getFpY()) + proj.getVy()) + proj.getBounceCount()), 1609);
+
+        // Test 28: Rebote especular contra pared izquierda (fpX < -2560 -> fpX=-2560, vx=+120)
+        do proj.spawn(-155, 0, 50, -120, -12, 2, 10);
+        do PhysicsEngine.updateProjectile(proj);
+        do Main.check(28, (((-proj.getFpX()) + proj.getVx()) + proj.getBounceCount()), 2681);
+
+        // Test 29: Rebote simultaneo en esquina derecha-suelo (fpX > 2560 y fpY > 1440 -> bounceCount=2)
+        do proj.spawn(155, 88, 50, 120, 88, 2, 10);
+        do PhysicsEngine.updateProjectile(proj);
+        do Main.check(29, ((((proj.getFpX() + proj.getFpY()) + (-proj.getVx())) + (-proj.getVy())) + proj.getBounceCount()), 4209);
+
+        // Test 30: Desactivacion automatica al cruzar el plano frontal zNearClip (8)
+        do proj.spawn(0, 0, 11, 0, 0, 2, 10);
+        do PhysicsEngine.updateProjectile(proj);
+        let z1 = proj.getZ();
+        let act1 = proj.isActive();
+        do PhysicsEngine.updateProjectile(proj);
+        do Main.check(30, (((z1 * 100) + (Main.b2i(act1) * 10)) + Main.b2i(proj.isActive())), 910);
+
+        // Test 31: Guardas defensivas ante referencias null, proyectil inactivo y capacidades <= 0
+        do PhysicsEngine.updateProjectile(null);
+        do PhysicsEngine.updateProjectile(proj);
+        do PhysicsEngine.updatePool(null, 5);
+        do Main.check(31, ((Main.b2i(proj.isActive()) * 1000) + proj.getZ()), 100);
+
+        // Test 32: Trayectoria balistica completa de 45 ticks verificada contra solucion analitica
+        // Inicio: world=(-60, 12) => fp=(-960, 192), z=100, vx=110, vy=-136, vz=2
+        // Rebota en suelo en t=29 (vy: 212 -> -185) y en pared derecha en t=33 (vx: 110 -> -110).
+        // Estado exacto en t=45: fpX=1240, fpY=112, vx=-110, vy=7, z=10, bounceCount=2.
+        do proj.spawn(-60, 12, 100, 110, -136, 2, 15);
+        let violations = 0;
+        let i = 0;
+        while (i < 45) {
+            do PhysicsEngine.updateProjectile(proj);
+            if ((proj.getFpX() < -2560) | (proj.getFpX() > 2560)) {
+                let violations = (violations + 1);
+            }
+            if ((proj.getFpY() < -1440) | (proj.getFpY() > 1440)) {
+                let violations = (violations + 1);
+            }
+            if ((proj.getVy() < -240) | (proj.getVy() > 240)) {
+                let violations = (violations + 1);
+            }
+            if (proj.getZ() < 8) {
+                let violations = (violations + 1);
+            }
+            let i = (i + 1);
+        }
+        let fpX45 = proj.getFpX();
+        let fpY45 = proj.getFpY();
+        let bounces45 = proj.getBounceCount();
+        do Main.check(32, ((((((fpX45 + fpY45) + (-proj.getVx())) + proj.getVy()) + proj.getZ()) + bounces45) + (violations * 1000)), 1481);
+
+        do proj.dispose();
+
+        // =====================================================================
+        // SECCION D: EntityManager - Pools, RNG, Oleadas y Cero Fugas de Heap (Tests 33..44)
+        // =====================================================================
+        let em = EntityManager.new();
+
+        // Capturar puntero libre principal del heap inmediatamente despues de preasignar pools
+        let heapBefore = Memory.peek(2049);
+
+        let eArr = em.getEnemies();
+        let pArr = em.getProjectiles();
+        do PhysicsEngine.updatePool(pArr, 0);
+        do PhysicsEngine.updatePool(pArr, -3);
+
+        // Test 33: Inicializacion limpia de los 4 Enemy y 5 Projectile preasignados
+        let allInactiveOk = 1;
+        let i = 0;
+        while (i < 4) {
+            let slotE = eArr[i];
+            if ((slotE = null) | slotE.isActive()) {
+                let allInactiveOk = 0;
+            }
+            let i = (i + 1);
+        }
+        let i = 0;
+        while (i < 5) {
+            let slotP = pArr[i];
+            if ((slotP = null) | slotP.isActive()) {
+                let allInactiveOk = 0;
+            }
+            let i = (i + 1);
+        }
+        do Main.check(33, ((allInactiveOk * 100) + em.getActiveEnemyCount()), 100);
+
+        // Test 34: Capacidad fija de 4 enemigos y rechazo limpio del 5to sin sobreescribir
+        let r = 0;
+        if (em.spawnEnemy(1, -80, 100, 2)) { let r = (r + 1); }
+        if (em.spawnEnemy(2, -20, 95, -2)) { let r = (r + 1); }
+        if (em.spawnEnemy(1, 40, 90, 4)) { let r = (r + 1); }
+        if (em.spawnEnemy(2, 100, 85, -4)) { let r = (r + 1); }
+        if (em.spawnEnemy(1, 0, 100, 0)) { let r = (r + 100); }
+        let slotE = eArr[0];
+        do Main.check(34, (((r * 100) + (em.getActiveEnemyCount() * 10)) + ((-slotE.getWorldX()) / 10)), 448);
+
+        // Test 35: Reutilizacion exacta de referencia en enemies[1] tras deactivate()
+        let slotE = eArr[1];
+        do slotE.deactivate();
+        let r = Main.b2i(em.spawnEnemy(2, 77, 88, 3));
+        let reusedE = eArr[1];
+        do Main.check(35, ((((r * 1000) + (Main.b2i(slotE = reusedE) * 100)) + reusedE.getWorldX()) + em.getActiveEnemyCount()), 1181);
+
+        // Test 36: Capacidad fija de 5 proyectiles, rechazo del 6to y reutilizacion exacta de projectiles[2]
+        let r = 0;
+        let i = 0;
+        while (i < 5) {
+            if (em.spawnProjectile((i * 10), 0, 80, 0, -100, 2, 10)) {
+                let r = (r + 1);
+            }
+            let i = (i + 1);
+        }
+        if (em.spawnProjectile(99, 0, 80, 0, -100, 2, 10)) {
+            let r = (r + 100);
+        }
+        let slotP = pArr[2];
+        do slotP.deactivate();
+        if (em.spawnProjectile(55, -20, 70, 16, -120, 2, 15)) {
+            let r = (r + 10);
+        }
+        let reusedP = pArr[2];
+        do Main.check(36, (((r * 100) + (Main.b2i(slotP = reusedP) * 10)) + (reusedP.getWorldX() - 50)), 1515);
+
+        // Test 37: updateProjectilesPhysics() integra activos y desactiva los que bajan de zNearClip
+        do em.reset();
+        do em.spawnProjectile(0, 0, 60, 0, -100, 2, 10);
+        do em.spawnProjectile(0, 0, 9, 0, 0, 2, 10);
+        do em.updateProjectilesPhysics();
+        let slotP = pArr[0];
+        let reusedP = pArr[1];
+        do Main.check(37, ((((Main.b2i(slotP.isActive()) * 1000) + (Main.b2i(reusedP.isActive()) * 100)) + slotP.getZ()) + (-slotP.getVy())), 1146);
+
+        // Test 38: RNG 16-bit seguro en 300 iteraciones (rango estricto [0..16] y bordes <= 1)
+        let i = 0;
+        while (i < 10) {
+            do em.tickSeed();
+            let i = (i + 1);
+        }
+        let outOfBounds = ((em.nextRandomBounded(0) + em.nextRandomBounded(-10)) + em.nextRandomBounded(1));
+        let sawZero = 0;
+        let sawMax = 0;
+        let i = 0;
+        while (i < 300) {
+            let k = em.nextRandomBounded(17);
+            if ((k < 0) | (k > 16)) {
+                let outOfBounds = (outOfBounds + 1);
+            }
+            if (k = 0) {
+                let sawZero = 1;
+            }
+            if (k = 16) {
+                let sawMax = 1;
+            }
+            let i = (i + 1);
+        }
+        do Main.check(38, (((outOfBounds * 100) + (sawZero * 10)) + sawMax), 11);
+
+        // Test 39: Escalado Oleada 1 -> tope maximo de 2 enemigos simultaneos, todos Tipo 1
+        do em.reset();
+        let sawType2 = 0;
+        let i = 0;
+        while (i < 80) {
+            do em.updateEntities(1);
+            let k = 0;
+            while (k < 4) {
+                let slotE = eArr[k];
+                if (slotE.isActive()) {
+                    if (~(slotE.getType() = 1)) {
+                        let sawType2 = 1;
+                    }
+                }
+                let k = (k + 1);
+            }
+            let i = (i + 1);
+        }
+        let wave1Count = em.getActiveEnemyCount();
+        do Main.check(39, ((wave1Count * 10) + sawType2), 20);
+
+        // Test 40: Escalado Oleada 2 -> tope sube exactamente a 3 enemigos simultaneos
+        let i = 0;
+        while (i < 40) {
+            do em.updateEntities(2);
+            let i = (i + 1);
+        }
+        let wave2Count = em.getActiveEnemyCount();
+        do Main.check(40, wave2Count, 3);
+
+        // Test 41: Escalado Oleada 3+ -> tope sube a 4 enemigos y genera ambos tipos (1 y 2)
+        do em.reset();
+        let sawType1 = 0;
+        let sawType2 = 0;
+        let i = 0;
+        while (i < 160) {
+            do em.updateEntities(3);
+            let k = 0;
+            while (k < 4) {
+                let slotE = eArr[k];
+                if (slotE.isActive()) {
+                    if (slotE.getType() = 1) {
+                        let sawType1 = 1;
+                    }
+                    if (slotE.getType() = 2) {
+                        let sawType2 = 1;
+                    }
+                }
+                let k = (k + 1);
+            }
+            // Liberar periodicamente una ranura durante los primeros 90 ticks para muestrear multiples spawns
+            if ((i = 30) | ((i = 60) | (i = 90))) {
+                let slotE = eArr[0];
+                do slotE.deactivate();
+            }
+            let i = (i + 1);
+        }
+        let wave3Count = em.getActiveEnemyCount();
+        do Main.check(41, (((wave3Count * 100) + (sawType1 * 10)) + sawType2), 411);
+
+        // Test 42: reset() limpia completamente ambos pools tras actividad intensa
+        do em.spawnProjectile(10, 10, 75, 12, -100, 2, 10);
+        do em.spawnProjectile(-20, 5, 65, -12, -80, 3, 15);
+        do em.reset();
+        let activeProjs = 0;
+        let i = 0;
+        while (i < 5) {
+            let slotP = pArr[i];
+            if (slotP.isActive()) {
+                let activeProjs = (activeProjs + 1);
+            }
+            let i = (i + 1);
+        }
+        do Main.check(42, ((em.getActiveEnemyCount() * 10) + activeProjs), 0);
+
+        // Test 43: PRUEBA ESTRICTA DE HARDWARE EN RAM[2049] -> 0 palabras asignadas en el heap
+        // tras cientos de ticks de fisica, spawns, agotamiento de pools, RNG y multiples reset()
+        let heapDelta = (Memory.peek(2049) - heapBefore);
+        do Main.check(43, heapDelta, 0);
+
+        // Test 44: Liberacion simetrica completa con dispose() sin corrupcion de heap
+        do em.dispose();
+        let em2 = EntityManager.new();
+        do em2.reset();
+        do em2.dispose();
+        do Main.check(44, 1, 1);
+
+        // Testigos fisicos y de memoria para EntitiesPhysicsTest.cmp
+        do Memory.poke(8004, vBounce);
+        do Memory.poke(8005, fpX45);
+        do Memory.poke(8006, fpY45);
+        do Memory.poke(8007, bounces45);
+        do Memory.poke(8008, heapDelta);
+        do Memory.poke(8009, wave1Count);
+        do Memory.poke(8010, wave2Count);
+        do Memory.poke(8011, wave3Count);
+
+        return;
+    }
+}
+

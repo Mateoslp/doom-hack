@@ -1,0 +1,204 @@
+function InputManager.new 0
+push constant 2
+call Memory.alloc 1
+pop pointer 0
+push constant 0
+pop this 0
+push constant 0
+pop this 1
+push pointer 0
+return
+function InputManager.normalizeKey 0
+push argument 0
+push constant 0
+lt
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+push argument 0
+push constant 97
+lt
+not
+push argument 0
+push constant 122
+gt
+not
+and
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push argument 0
+push constant 32
+sub
+return
+label IF_FALSE1
+push argument 0
+return
+function InputManager.poll 1
+push argument 0
+pop pointer 0
+push this 0
+pop this 1
+call Keyboard.keyPressed 0
+pop local 0
+push local 0
+call InputManager.normalizeKey 1
+pop this 0
+push constant 0
+return
+function InputManager.getCurrentKey 0
+push argument 0
+pop pointer 0
+push this 0
+return
+function InputManager.isMoveLeftHeld 0
+push argument 0
+pop pointer 0
+push this 0
+call GameConstants.keyA 0
+eq
+push this 0
+call GameConstants.keyLeft 0
+eq
+or
+return
+function InputManager.isMoveRightHeld 0
+push argument 0
+pop pointer 0
+push this 0
+call GameConstants.keyD 0
+eq
+push this 0
+call GameConstants.keyRight 0
+eq
+or
+return
+function InputManager.isAimUpHeld 0
+push argument 0
+pop pointer 0
+push this 0
+call GameConstants.keyW 0
+eq
+push this 0
+call GameConstants.keyUp 0
+eq
+or
+return
+function InputManager.isAimDownHeld 0
+push argument 0
+pop pointer 0
+push this 0
+call GameConstants.keyS 0
+eq
+push this 0
+call GameConstants.keyDown 0
+eq
+or
+return
+function InputManager.isFireHeld 0
+push argument 0
+pop pointer 0
+push this 0
+call GameConstants.keySpace 0
+eq
+return
+function InputManager.isStartTriggered 2
+push argument 0
+pop pointer 0
+push this 0
+call GameConstants.keySpace 0
+eq
+push this 0
+call GameConstants.keyEnter 0
+eq
+or
+pop local 0
+push this 1
+call GameConstants.keySpace 0
+eq
+push this 1
+call GameConstants.keyEnter 0
+eq
+or
+pop local 1
+push local 0
+push local 1
+not
+and
+return
+function InputManager.isPauseTriggered 1
+push argument 0
+pop pointer 0
+call GameConstants.keyP 0
+pop local 0
+push this 0
+push local 0
+eq
+push this 1
+push local 0
+eq
+not
+and
+return
+function InputManager.isReloadTriggered 1
+push argument 0
+pop pointer 0
+call GameConstants.keyR 0
+pop local 0
+push this 0
+push local 0
+eq
+push this 1
+push local 0
+eq
+not
+and
+return
+function InputManager.isRestartTriggered 1
+push argument 0
+pop pointer 0
+call GameConstants.keyR 0
+pop local 0
+push this 0
+push local 0
+eq
+push this 1
+push local 0
+eq
+not
+and
+return
+function InputManager.isMenuExitTriggered 1
+push argument 0
+pop pointer 0
+call GameConstants.keyEsc 0
+pop local 0
+push this 0
+push local 0
+eq
+push this 1
+push local 0
+eq
+not
+and
+return
+function InputManager.clearState 0
+push argument 0
+pop pointer 0
+push constant 0
+pop this 0
+push constant 0
+pop this 1
+push constant 0
+return
+function InputManager.dispose 0
+push argument 0
+pop pointer 0
+push pointer 0
+call Memory.deAlloc 1
+pop temp 0
+push constant 0
+return

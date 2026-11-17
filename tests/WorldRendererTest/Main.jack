@@ -1,0 +1,295 @@
+/**
+ * Main.jack (Suite de Pruebas Automatizadas - Modulo 2: WorldRenderer)
+ * Ubicacion: C:/DoomProject/tests/WorldRendererTest/Main.jack
+ *
+ * Verifica en VMEmulator v2.5 (inspeccionando estado logico y VRAM real RAM[16384..24575]):
+ *   1. Ciclo de vida y maquina modular scrollPhase (0..15): new, advanceScroll positivo,
+ *      cero, negativo, extremos de 16 bits (32767, -32768), reset y dispose.
+ *   2. drawSafeRect: rectangulos invertidos, completamente fuera de [0..511] x [0..206]
+ *      (sin lineas fantasma), recortes parciales en esquinas y proteccion estricta del HUD.
+ *   3. drawSafeLine: horizontales, verticales y diagonales (Cohen-Sutherland entero),
+ *      interseccion exacta con y = 206, diagonales extremas anti-overflow (-32768..32767)
+ *      y proteccion del HUD.
+ *   4. drawSafeCircle: radios negativos, centros fuera del viewport, radio 0, acotamiento
+ *      automatico de radio junto a y = 206 y radio extremo 32767 sin ERR12/ERR13.
+ *   5. renderCorridor(vpX): limpieza exclusiva de viewport, portal de contraste blanco,
+ *      desplazamiento real en VRAM de los anillos del suelo al avanzar scrollPhase,
+ *      paralaje horizontal con MathUtils.computeVanishingX y aislamiento total de y = 207..255.
+ *
+ * Registro en RAM:
+ *   RAM[8000] = total de pruebas ejecutadas (36)
+ *   RAM[8001] = pruebas aprobadas (36)
+ *   RAM[8002] = pruebas fallidas (0)
+ *   RAM[8003] = ID de la primera prueba fallida (0 si todas aprueban)
+ *   RAM[8004..8011] = testigos numericos verificados por WorldRendererTest.cmp
+ */
+class Main {
+
+    function int nonZero(int val) {
+        if (~(val = 0)) {
+            return 1;
+        }
+        return 0;
+    }
+
+    function void check(int testId, int actual, int expected) {
+        var int total;
+        var int passed;
+        var int failed;
+        var int firstFail;
+
+        let total = (Memory.peek(8000) + 1);
+        do Memory.poke(8000, total);
+
+        if (actual = expected) {
+            let passed = (Memory.peek(8001) + 1);
+            do Memory.poke(8001, passed);
+        } else {
+            let failed = (Memory.peek(8002) + 1);
+            do Memory.poke(8002, failed);
+            let firstFail = Memory.peek(8003);
+            if (firstFail = 0) {
+                do Memory.poke(8003, testId);
+            }
+        }
+        return;
+    }
+
+    function void main() {
+        var int minInt16;
+        var int sentinel;
+        var WorldRenderer wr;
+        var int wPhaseExtreme;
+        var int wFloorT0;
+        var int wFloorT6;
+        var int wParallax;
+        var int wHudGuard;
+        var int vpLeft;
+
+        do Memory.poke(8000, 0);
+        do Memory.poke(8001, 0);
+        do Memory.poke(8002, 0);
+        do Memory.poke(8003, 0);
+
+        let minInt16 = ((-32767) - 1);
+        let sentinel = 21845;
+
+        // Sembrar centinelas en la frontera exacta del HUD (y = 207 -> base 23008) y fin (24575)
+        do Memory.poke(23008, sentinel);
+        do Memory.poke(23018, sentinel);
+        do Memory.poke(23023, sentinel);
+        do Memory.poke(23028, sentinel);
+        do Memory.poke(23039, sentinel);
+        do Memory.poke(24575, sentinel);
+
+        // =====================================================================
+        // BLOQUE 1: Estado scrollPhase y ciclo de vida (Tests 1..9)
+        // =====================================================================
+        let wr = WorldRenderer.new();
+        do Main.check(1, wr.getScrollPhase(), 0);
+
+        do wr.advanceScroll(2);
+        do Main.check(2, wr.getScrollPhase(), 2);
+
+        do wr.advanceScroll(14);
+        do Main.check(3, wr.getScrollPhase(), 0);
+
+        do wr.advanceScroll(15);
+        do wr.advanceScroll(2);
+        do Main.check(4, wr.getScrollPhase(), 1);
+
+        do wr.advanceScroll(0);
+        do Main.check(5, wr.getScrollPhase(), 1);
+
+        do wr.advanceScroll(-3);
+        do Main.check(6, wr.getScrollPhase(), 14);
+
+        // Pasos extremos de 16 bits: 32767 mod 16 = 15 -> (14+15) mod 16 = 13; -32768 mod 16 = 0
+        do wr.advanceScroll(32767);
+        do wr.advanceScroll(minInt16);
+        let wPhaseExtreme = wr.getScrollPhase();
+        do Main.check(7, wPhaseExtreme, 13);
+
+        do wr.reset();
+        do Main.check(8, wr.getScrollPhase(), 0);
+
+        do wr.dispose();
+        let wr = WorldRenderer.new();
+        do Main.check(9, wr.getScrollPhase(), 0);
+
+        // =====================================================================
+        // BLOQUE 2: drawSafeRect (Tests 10..16)
+        // =====================================================================
+        do Memory.poke(16384, 0);
+        do Memory.poke(16415, 0);
+        do Memory.poke(18307, 0);
+        do Memory.poke(22976, 0);
+        do Memory.poke(23007, 0);
+        do Screen.setColor(true);
+
+        // Rectangulos degenerados (x1 > x2, y1 > y2) ignorados sin ERR9
+        do WorldRenderer.drawSafeRect(100, 50, 80, 70);
+        do WorldRenderer.drawSafeRect(48, 70, 63, 50);
+        do Main.check(10, Memory.peek(18307), 0);
+
+        // Rectangulos completamente exteriores en los 4 lados no dejan trazos fantasma
+        do WorldRenderer.drawSafeRect(-50, 0, -1, 10);
+        do WorldRenderer.drawSafeRect(512, 0, 600, 10);
+        do WorldRenderer.drawSafeRect(0, -20, 15, -1);
+        do WorldRenderer.drawSafeRect(0, 207, 15, 250);
+        do Main.check(11, ((Memory.peek(16384) + Memory.peek(16415)) + Memory.peek(22976)), 0);
+
+        // Recorte parcial superior-izquierdo -> cubre palabra (x=0..15, y=0) = RAM[16384]
+        do WorldRenderer.drawSafeRect(-20, -15, 15, 2);
+        do Main.check(12, Memory.peek(16384), -1);
+
+        // Recorte parcial inferior-derecho intentando invadir HUD -> cubre RAM[23007] (y=206)
+        do WorldRenderer.drawSafeRect(496, 205, 700, 250);
+        do Main.check(13, Memory.peek(23007), -1);
+        do Main.check(14, Memory.peek(23039), sentinel);
+
+        // Coordenadas extremas de 16 bits fuera de rango
+        do WorldRenderer.drawSafeRect(minInt16, 10, -100, 20);
+        do WorldRenderer.drawSafeRect(1000, 10, 32767, 20);
+        do Main.check(15, Memory.peek(23008), sentinel);
+
+        // Borrado selectivo en blanco
+        do Screen.setColor(false);
+        do WorldRenderer.drawSafeRect(0, 0, 15, 2);
+        do Screen.setColor(true);
+        do Main.check(16, Memory.peek(16384), 0);
+
+        // =====================================================================
+        // BLOQUE 3: drawSafeLine - Cohen-Sutherland 16-bit (Tests 17..24)
+        // =====================================================================
+        // Horizontales fuera del viewport
+        do WorldRenderer.drawSafeLine(0, -5, 100, -5);
+        do WorldRenderer.drawSafeLine(0, 207, 100, 207);
+        do WorldRenderer.drawSafeLine(-80, 10, -5, 10);
+        do WorldRenderer.drawSafeLine(520, 10, 650, 10);
+        do Main.check(17, Memory.peek(23008), sentinel);
+
+        // Horizontal recortada en ambos extremos -> llena y=10 (base 16384 + 320 = 16704)
+        do Memory.poke(16704, 0);
+        do Memory.poke(16735, 0);
+        do WorldRenderer.drawSafeLine(-100, 10, 600, 10);
+        do Main.check(18, (Memory.peek(16704) + Memory.peek(16735)), -2);
+
+        // Vertical recortada en y=0..206 (intentando cruzar a -50 y 255)
+        do Memory.poke(16384, 0);
+        do Memory.poke(22976, 0);
+        do WorldRenderer.drawSafeLine(0, -50, 0, 255);
+        do Main.check(19, (((Memory.peek(16384) & 1) * 10) + (Memory.peek(22976) & 1)), 11);
+
+        // Diagonales completamente exteriores
+        do WorldRenderer.drawSafeLine(-100, -100, -10, 50);
+        do WorldRenderer.drawSafeLine(600, 10, 700, 100);
+        do WorldRenderer.drawSafeLine(100, 210, 300, 250);
+        do Main.check(20, Memory.peek(23018), sentinel);
+
+        // Diagonal que cruza exactamente y = 206 en x = 250: (240,196) -> (260,216)
+        // Palabra (x=240..255, y=206) = 22976 + 15 = 22991, bit 10 (250 - 240) = 1024
+        do Memory.poke(22991, 0);
+        do WorldRenderer.drawSafeLine(240, 196, 260, 216);
+        do Main.check(21, ((Main.nonZero((Memory.peek(22991) & 1024)) * 10) + Main.nonZero((Memory.peek(23023) - sentinel))), 10);
+
+        // Diagonal con delta grande (-1500..1500) -> cruza (100, 100) sin overflow 16-bit
+        // Palabra (x=96..111, y=100) = 16384 + 3200 + 6 = 19590
+        do Memory.poke(19590, 0);
+        do WorldRenderer.drawSafeLine(-1500, -1500, 1500, 1500);
+        do Main.check(22, Main.nonZero(Memory.peek(19590)), 1);
+
+        // Diagonal en rango completo de 16 bits (-32768..32767)
+        do WorldRenderer.drawSafeLine(minInt16, minInt16, 32767, 32767);
+        do Main.check(23, Memory.peek(23008), sentinel);
+
+        // Via rapida interior diagonal (32, 30) -> (48, 46): palabra (32..47, y=30) = 16384+960+2 = 17346
+        do Memory.poke(17346, 0);
+        do WorldRenderer.drawSafeLine(32, 30, 48, 46);
+        do Main.check(24, Main.nonZero(Memory.peek(17346)), 1);
+
+        // =====================================================================
+        // BLOQUE 4: drawSafeCircle (Tests 25..30)
+        // =====================================================================
+        // Palabra (x=160..175, y=80) = 16384 + 2560 + 10 = 18954
+        do Memory.poke(18954, 0);
+
+        // Radios negativos ignorados
+        do WorldRenderer.drawSafeCircle(160, 80, -10);
+        do WorldRenderer.drawSafeCircle(160, 80, minInt16);
+        do Main.check(25, Memory.peek(18954), 0);
+
+        // Centros fuera del viewport ignorados (previene ERR12 e invasion de HUD)
+        do WorldRenderer.drawSafeCircle(-1, 80, 5);
+        do WorldRenderer.drawSafeCircle(512, 80, 5);
+        do WorldRenderer.drawSafeCircle(160, -1, 5);
+        do WorldRenderer.drawSafeCircle(160, 207, 5);
+        do WorldRenderer.drawSafeCircle(160, 230, 10);
+        do Main.check(26, Memory.peek(23018), sentinel);
+
+        // Radio 0 dibuja exactamente 1 pixel (bit 0 de 18954 = 1)
+        do WorldRenderer.drawSafeCircle(160, 80, 0);
+        do Main.check(27, Memory.peek(18954), 1);
+
+        // Circulo junto al piso del viewport (320, 202, r=25) -> acota safeR a 4 (toca y=206, no 207)
+        // Palabra (x=320..335, y=206) = 22976 + 20 = 22996; y=207 -> 23008 + 20 = 23028
+        do Memory.poke(22996, 0);
+        do WorldRenderer.drawSafeCircle(320, 202, 25);
+        do Main.check(28, ((Main.nonZero(Memory.peek(22996)) * 10) + Main.nonZero((Memory.peek(23028) - sentinel))), 10);
+
+        // Radio extremo 32767 en (256, 100) -> acota safeR=100 sin overflow, llena centro 19600
+        do Memory.poke(19600, 0);
+        do WorldRenderer.drawSafeCircle(256, 100, 32767);
+        do Main.check(29, Memory.peek(19600), -1);
+
+        // Integridad acumulada de todos los centinelas del HUD tras pruebas de primitivas
+        do Main.check(30, ((Memory.peek(23008) - sentinel) + (Memory.peek(24575) - sentinel)), 0);
+
+        // =====================================================================
+        // BLOQUE 5: renderCorridor(vpX) - Escenario dinamico y paralaje (Tests 31..36)
+        // =====================================================================
+        do wr.reset();
+        do wr.renderCorridor(GameConstants.centerX());
+
+        // Borde superior del portal (y=76, x=256..271 -> 18832) negro (-1) e interior (y=104 -> 19728) blanco (0)
+        do Main.check(31, ((Memory.peek(18832) * 10) + Memory.peek(19728)), -10);
+
+        // En scrollPhase = 0, el anillo frontal i=0 traza el suelo en y=155 (21360 = -1) y no en y=165 (21680 = 0)
+        let wFloorT0 = ((Main.nonZero(Memory.peek(21360)) * 10) + Main.nonZero(Memory.peek(21680)));
+        do Main.check(32, wFloorT0, 10);
+
+        // Avanzar scrollPhase a 6 y re-renderizar: el anillo avanza de y=155 (ahora 0) a y=165 (ahora -1)
+        do wr.advanceScroll(6);
+        do wr.renderCorridor(GameConstants.centerX());
+        let wFloorT6 = ((Main.nonZero(Memory.peek(21360)) * 10) + Main.nonZero(Memory.peek(21680)));
+        do Main.check(33, wFloorT6, 1);
+        do Main.check(34, (wFloorT0 - wFloorT6), 9);
+
+        // Paralaje con playerX = +160 -> vpX = 216 (portal desplazado a [168..264]):
+        // En y=76, palabra 11 (x=176..191 -> 18827) es -1 y palabra 20 (x=320..335 -> 18836) es 0
+        let vpLeft = MathUtils.computeVanishingX(GameConstants.corridorMaxX());
+        do wr.renderCorridor(vpLeft);
+        let wParallax = ((Main.nonZero(Memory.peek(18827)) * 10) + Main.nonZero(Memory.peek(18836)));
+        do Main.check(35, wParallax, 10);
+
+        // Entradas vpX fuera de rango (-500 y 9999) + verificacion final de no invasion al HUD
+        do wr.renderCorridor(-500);
+        do wr.renderCorridor(9999);
+        let wHudGuard = ((((Memory.peek(23008) - sentinel) + (Memory.peek(23023) - sentinel)) + (Memory.peek(23039) - sentinel)) + (Memory.peek(24575) - sentinel));
+        do Main.check(36, wHudGuard, 0);
+
+        // Testigos numericos para comparacion .cmp en RAM[8004..8011]
+        do Memory.poke(8004, wPhaseExtreme);
+        do Memory.poke(8005, wFloorT0);
+        do Memory.poke(8006, wFloorT6);
+        do Memory.poke(8007, wParallax);
+        do Memory.poke(8008, vpLeft);
+        do Memory.poke(8009, Memory.peek(23008));
+        do Memory.poke(8010, Memory.peek(24575));
+        do Memory.poke(8011, wHudGuard);
+
+        do wr.dispose();
+        return;
+    }
+}
+

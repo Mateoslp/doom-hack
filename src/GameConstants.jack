@@ -1,0 +1,246 @@
+/**
+ * GameConstants.jack
+ * Centraliza todas las constantes globales de configuracion, geometria de pantalla,
+ * limites del corredor pseudo-3D, parametros fisicos en punto fijo Q11.4,
+ * limites de pools de entidades y codigos de teclado verificados en Hack/VMEmulator.
+ *
+ * Nota de arquitectura Jack: En Jack las variables static son privadas a la clase
+ * y no admiten inicializacion en linea; por ello el contrato aprobado expone cada
+ * constante mediante funciones estaticas puras (0 palabras de RAM estatica y 0 heap).
+ */
+class GameConstants {
+
+    // -------------------------------------------------------------------------
+    // 1. Resolucion y particion vertical de pantalla (512 x 256 pixeles)
+    //    - Viewport 3D:       filas   0 .. 206 (207 lineas)
+    //    - Separador visual:  filas 207 .. 208 (  2 lineas)
+    //    - Panel HUD:         filas 209 .. 255 ( 47 lineas, filas Output 19..22)
+    // -------------------------------------------------------------------------
+
+    function int screenWidth() {
+        return 512;
+    }
+
+    function int screenHeight() {
+        return 256;
+    }
+
+    function int viewportTop() {
+        return 0;
+    }
+
+    function int viewportBottom() {
+        return 206;
+    }
+
+    function int hudDividerY() {
+        return 207;
+    }
+
+    function int hudDividerBottom() {
+        return 208;
+    }
+
+    function int hudTop() {
+        return 209;
+    }
+
+    function int hudBottom() {
+        return 255;
+    }
+
+    function int centerX() {
+        return 256;
+    }
+
+    function int baseHorizonY() {
+        return 104;
+    }
+
+    /** Distancia focal entera para proyeccion perspectiva 1/z (64 px). */
+    function int focalLength() {
+        return 64;
+    }
+
+    // -------------------------------------------------------------------------
+    // 2. Geometria logica del corredor y rangos de profundidad z
+    // -------------------------------------------------------------------------
+
+    /** Semiancho logico del corredor: worldX pertenece a [-160, +160]. */
+    function int corridorMaxX() {
+        return 160;
+    }
+
+    /** Semialto logico del corredor: worldY pertenece a [-90, +90] (+90 = suelo). */
+    function int corridorMaxY() {
+        return 90;
+    }
+
+    /** Profundidad inicial de aparicion al fondo del pasillo. */
+    function int zSpawn() {
+        return 100;
+    }
+
+    /** Distancia axial a la que un enemigo alcanza alcance cuerpo a cuerpo. */
+    function int zMelee() {
+        return 14;
+    }
+
+    /** Plano frontal minimo de recorte para evitar division por cero o escala extrema. */
+    function int zNearClip() {
+        return 8;
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. Fisica discreta en punto fijo Q11.4 (valor_escalado = valor_real * 16)
+    // -------------------------------------------------------------------------
+
+    /** Factor de escala Q11.4: 1 unidad de mundo = 16 subunidades. */
+    function int fpScale() {
+        return 16;
+    }
+
+    /** Limite lateral en punto fijo: 160 * 16 = 2560. */
+    function int fpMaxX() {
+        return 2560;
+    }
+
+    /** Coordenada Y del suelo en punto fijo (+y hacia abajo): 90 * 16 = 1440. */
+    function int fpFloorY() {
+        return 1440;
+    }
+
+    /** Coordenada Y del techo en punto fijo: -90 * 16 = -1440. */
+    function int fpCeilY() {
+        return -1440;
+    }
+
+    /** Aceleracion gravitacional vertical por tick en Q11.4 (+12 = 0.75 u/tick^2). */
+    function int gravity() {
+        return 12;
+    }
+
+    /** Velocidad vertical terminal en Q11.4 para garantizar ausencia de overflow. */
+    function int maxVy() {
+        return 240;
+    }
+
+    /** Numerador del coeficiente racional de restitucion en el suelo (7/8). */
+    function int restitutionNum() {
+        return 7;
+    }
+
+    /** Denominador del coeficiente racional de restitucion en el suelo (7/8). */
+    function int restitutionDen() {
+        return 8;
+    }
+
+    // -------------------------------------------------------------------------
+    // 4. Parametros del jugador y combate
+    // -------------------------------------------------------------------------
+
+    function int playerSpeedX() {
+        return 12;
+    }
+
+    function int playerAimSpeedY() {
+        return 4;
+    }
+
+    function int aimMinY() {
+        return 72;
+    }
+
+    function int aimMaxY() {
+        return 136;
+    }
+
+    function int maxHealth() {
+        return 100;
+    }
+
+    function int maxAmmo() {
+        return 24;
+    }
+
+    function int fireCooldownTicks() {
+        return 4;
+    }
+
+    function int invulnTicks() {
+        return 8;
+    }
+
+    // -------------------------------------------------------------------------
+    // 5. Presupuesto fijo de entidades (Object Pools) y temporizacion
+    // -------------------------------------------------------------------------
+
+    function int maxEnemies() {
+        return 4;
+    }
+
+    function int maxProjectiles() {
+        return 5;
+    }
+
+    function int frameDelayMs() {
+        return 25;
+    }
+
+    // -------------------------------------------------------------------------
+    // 6. Codigos de teclado Hack verificados en VMEmulator v2.5 (RAM[24576])
+    // -------------------------------------------------------------------------
+
+    function char keySpace() {
+        return 32;
+    }
+
+    function char keyEnter() {
+        return 128;
+    }
+
+    function char keyEsc() {
+        return 140;
+    }
+
+    function char keyLeft() {
+        return 130;
+    }
+
+    function char keyUp() {
+        return 131;
+    }
+
+    function char keyRight() {
+        return 132;
+    }
+
+    function char keyDown() {
+        return 133;
+    }
+
+    function char keyA() {
+        return 65;
+    }
+
+    function char keyD() {
+        return 68;
+    }
+
+    function char keyW() {
+        return 87;
+    }
+
+    function char keyS() {
+        return 83;
+    }
+
+    function char keyP() {
+        return 80;
+    }
+
+    function char keyR() {
+        return 82;
+    }
+}
+

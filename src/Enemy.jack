@@ -1,0 +1,249 @@
+/**
+ * Enemy.jack
+ * Entidad enemiga reutilizable para el object pool fijo de HELLGATE 16
+ * (Modulo 4 del Plan Modular de Desarrollo / Capa 2 / Ficha Tecnica #8).
+ *
+ * Parametriza las dos variantes del GDD sobre una unica estructura de 10 palabras:
+ *   - Tipo 1 (Acechador Abisal): hp = 2, speedZ = 2, baseWidth = 22, baseHeight = 32,
+ *     meleeDamage = 15, puntaje = +100.
+ *   - Tipo 2 (Bruto Igneo):      hp = 4, speedZ = 1, baseWidth = 28 (+25%),
+ *     baseHeight = 36, meleeDamage = 25, puntaje = +250.
+ *
+ * Invariantes garantizados en 16 bits:
+ *   - worldX pertenece a [-corridorMaxX, +corridorMaxX] = [-160, +160].
+ *   - worldY fijo en +12 (alineado con el piso del portal en z = 100 y eje de mira).
+ *   - z pertenece a [zNearClip, zSpawn] = [8, 100], deteniendo el avance frontal en
+ *     zMelee (14) para combate cuerpo a cuerpo sin division por cero ni explosion 1/z.
+ *   - enemyType se preserva al morir para que CollisionManager consulte getType()
+ *     tras takeDamage(...) = true (Contrato #4 y #5).
+ */
+class Enemy {
+
+    field boolean active;
+    field int enemyType;
+    field int worldX;
+    field int worldY;
+    field int z;
+    field int speedZ;
+    field int strafeVx;
+    field int hp;
+    field int attackTimer;
+    field int hitFlashTimer;
+
+    /** Reserva una ranura de enemigo inicialmente inactiva para el pool. */
+    constructor Enemy new() {
+        let enemyType = 1;
+        do deactivate();
+        return this;
+    }
+
+    /**
+     * Activa y configura el enemigo en la ranura existente sin asignar memoria.
+     * Cualquier tipo distinto de 2 se normaliza defensivamente a Tipo 1.
+     */
+    method void spawn(int type, int startX, int startZ, int initStrafeVx) {
+        var int maxC;
+
+        let maxC = GameConstants.corridorMaxX();
+        let active = true;
+
+        if (type = 2) {
+            let enemyType = 2;
+            let hp = 4;
+            let speedZ = 1;
+            let attackTimer = 18;
+        } else {
+            let enemyType = 1;
+            let hp = 2;
+            let speedZ = 2;
+            let attackTimer = 10;
+        }
+
+        let worldX = MathUtils.clamp(startX, (-maxC), maxC);
+        let worldY = 12;
+        let z = MathUtils.clamp(startZ, GameConstants.zNearClip(), GameConstants.zSpawn());
+        let strafeVx = MathUtils.clamp(initStrafeVx, -16, 16);
+        let hitFlashTimer = 0;
+        return;
+    }
+
+    /**
+     * Marca la ranura como libre para reutilizacion inmediata en el pool.
+     * Preserva enemyType para consultas inmediatas posteriores a la baja.
+     */
+    method void deactivate() {
+        let active = false;
+        let worldX = 0;
+        let worldY = 12;
+        let z = GameConstants.zSpawn();
+        let speedZ = 0;
+        let strafeVx = 0;
+        let hp = 0;
+        let attackTimer = 0;
+        let hitFlashTimer = 0;
+        return;
+    }
+
+    /**
+     * Avanza 1 tick la cinematica y los temporizadores del enemigo activo:
+     *   1. Decrementa hitFlashTimer y attackTimer si son positivos.
+     *   2. Desplaza worldX con rebote especular en las paredes [-160, +160].
+     *   3. Aproxima z hacia el jugador hasta el plano cuerpo a cuerpo zMelee (14).
+     */
+    method void update() {
+        var int maxC;
+        var int nextX;
+        var int meleeZ;
+        var int nextZ;
+
+        if (~active) {
+            return;
+        }
+
+        if (hitFlashTimer > 0) {
+            let hitFlashTimer = (hitFlashTimer - 1);
+        }
+
+        if (attackTimer > 0) {
+            let attackTimer = (attackTimer - 1);
+        }
+
+        let maxC = GameConstants.corridorMaxX();
+        let nextX = (worldX + strafeVx);
+        if (nextX < (-maxC)) {
+            let worldX = (-maxC);
+            let strafeVx = (-strafeVx);
+        } else {
+            if (nextX > maxC) {
+                let worldX = maxC;
+                let strafeVx = (-strafeVx);
+            } else {
+                let worldX = nextX;
+            }
+        }
+
+        let meleeZ = GameConstants.zMelee();
+        if (z > meleeZ) {
+            let nextZ = (z - speedZ);
+            if (nextZ < meleeZ) {
+                let z = meleeZ;
+            } else {
+                let z = nextZ;
+            }
+        }
+
+        return;
+    }
+
+    /**
+     * Aplica dano positivo al enemigo activo.
+     * Si sobrevive (hp > 0), activa hitFlashTimer = 2 y retorna false.
+     * Si muere (hp llega a 0), desactiva la entidad preservando enemyType y retorna true
+     * conforme a los Contratos #4 y #5 para que CollisionManager registre la baja.
+     */
+    method boolean takeDamage(int dmg) {
+        if (~active) {
+            return false;
+        }
+        if (~(dmg > 0)) {
+            return false;
+        }
+
+        if (~(dmg < hp)) {
+            let hp = 0;
+            let active = false;
+            let hitFlashTimer = 0;
+            return true;
+        }
+
+        let hp = (hp - dmg);
+        let hitFlashTimer = 2;
+        return false;
+    }
+
+    /**
+     * Retorna true si el enemigo esta activo, fuera del plano melee (z > zMelee)
+     * y su temporizador de disparo llego a 0.
+     */
+    method boolean isReadyToShoot() {
+        if (~active) {
+            return false;
+        }
+        if (~(z > GameConstants.zMelee())) {
+            return false;
+        }
+        return (attackTimer = 0);
+    }
+
+    /** Reinicia la cuenta regresiva hasta el proximo lanzamiento de proyectil. */
+    method void resetAttackTimer(int ticks) {
+        let attackTimer = MathUtils.clamp(ticks, 0, 1000);
+        return;
+    }
+
+    /** Indica si esta ranura del pool representa un enemigo vivo en escena. */
+    method boolean isActive() {
+        return active;
+    }
+
+    /** Indica si debe renderizarse con inversion visual de impacto en este tick. */
+    method boolean isHitFlashing() {
+        return (active & (hitFlashTimer > 0));
+    }
+
+    /** Variante del enemigo: 1 (Acechador) o 2 (Bruto Igneo). */
+    method int getType() {
+        return enemyType;
+    }
+
+    /** Posicion horizontal en unidades de corredor [-160, +160]. */
+    method int getWorldX() {
+        return worldX;
+    }
+
+    /** Posicion vertical en unidades de corredor. */
+    method int getWorldY() {
+        return worldY;
+    }
+
+    /** Profundidad axial respecto a la camara en [8, 100]. */
+    method int getZ() {
+        return z;
+    }
+
+    /** Puntos de vida restantes del enemigo. */
+    method int getHp() {
+        return hp;
+    }
+
+    /** Semiancho base sin proyectar (22 para Tipo 1, 28 para Tipo 2). */
+    method int getBaseWidth() {
+        if (enemyType = 2) {
+            return 28;
+        }
+        return 22;
+    }
+
+    /** Semialto base sin proyectar (32 para Tipo 1, 36 para Tipo 2). */
+    method int getBaseHeight() {
+        if (enemyType = 2) {
+            return 36;
+        }
+        return 32;
+    }
+
+    /** Dano infligido por ataque cuerpo a cuerpo en z <= zMelee (15 o 25). */
+    method int getMeleeDamage() {
+        if (enemyType = 2) {
+            return 25;
+        }
+        return 15;
+    }
+
+    /** Libera las 10 palabras de esta instancia al cerrar el juego. */
+    method void dispose() {
+        do Memory.deAlloc(this);
+        return;
+    }
+}
+

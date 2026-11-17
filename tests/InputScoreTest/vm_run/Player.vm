@@ -1,0 +1,318 @@
+function Player.new 0
+push constant 8
+call Memory.alloc 1
+pop pointer 0
+push pointer 0
+call Player.reset 1
+pop temp 0
+push pointer 0
+return
+function Player.reset 0
+push argument 0
+pop pointer 0
+push constant 0
+pop this 0
+call GameConstants.baseHorizonY 0
+pop this 1
+call GameConstants.maxHealth 0
+pop this 2
+call GameConstants.maxAmmo 0
+pop this 3
+push constant 0
+pop this 4
+push constant 0
+pop this 5
+push constant 0
+pop this 6
+push constant 0
+pop this 7
+push constant 0
+return
+function Player.updateTimers 0
+push argument 0
+pop pointer 0
+push this 4
+push constant 0
+gt
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push this 4
+push constant 1
+sub
+pop this 4
+label IF_FALSE0
+push this 5
+push constant 0
+gt
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push this 5
+push constant 1
+sub
+pop this 5
+label IF_FALSE1
+push this 6
+push constant 0
+gt
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push this 6
+push constant 4
+gt
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push this 6
+push constant 4
+sub
+pop this 6
+goto IF_END3
+label IF_FALSE3
+push constant 0
+pop this 6
+label IF_END3
+label IF_FALSE2
+push this 7
+push constant 0
+gt
+if-goto IF_TRUE4
+goto IF_FALSE4
+label IF_TRUE4
+push this 7
+push constant 1
+sub
+pop this 7
+label IF_FALSE4
+push constant 0
+return
+function Player.moveLeft 1
+push argument 0
+pop pointer 0
+call GameConstants.corridorMaxX 0
+pop local 0
+push this 0
+call GameConstants.playerSpeedX 0
+sub
+push local 0
+neg
+push local 0
+call MathUtils.clamp 3
+pop this 0
+push constant 0
+return
+function Player.moveRight 1
+push argument 0
+pop pointer 0
+call GameConstants.corridorMaxX 0
+pop local 0
+push this 0
+call GameConstants.playerSpeedX 0
+add
+push local 0
+neg
+push local 0
+call MathUtils.clamp 3
+pop this 0
+push constant 0
+return
+function Player.aimUp 0
+push argument 0
+pop pointer 0
+push this 1
+call GameConstants.playerAimSpeedY 0
+sub
+call GameConstants.aimMinY 0
+call GameConstants.aimMaxY 0
+call MathUtils.clamp 3
+pop this 1
+push constant 0
+return
+function Player.aimDown 0
+push argument 0
+pop pointer 0
+push this 1
+call GameConstants.playerAimSpeedY 0
+add
+call GameConstants.aimMinY 0
+call GameConstants.aimMaxY 0
+call MathUtils.clamp 3
+pop this 1
+push constant 0
+return
+function Player.tryFire 0
+push argument 0
+pop pointer 0
+push this 2
+push constant 0
+gt
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+push this 3
+push constant 0
+gt
+not
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push constant 0
+return
+label IF_FALSE1
+push this 4
+push constant 0
+gt
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push constant 0
+return
+label IF_FALSE2
+push this 3
+push constant 1
+sub
+pop this 3
+call GameConstants.fireCooldownTicks 0
+pop this 4
+push constant 2
+pop this 5
+push constant 8
+pop this 6
+push constant 0
+not
+return
+function Player.reload 1
+push argument 0
+pop pointer 0
+push this 2
+push constant 0
+gt
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+call GameConstants.maxAmmo 0
+pop local 0
+push this 3
+push local 0
+lt
+not
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push constant 0
+return
+label IF_FALSE1
+push local 0
+pop this 3
+push constant 0
+not
+return
+function Player.takeDamage 0
+push argument 0
+pop pointer 0
+push argument 1
+push constant 0
+gt
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+push this 2
+push constant 0
+gt
+not
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push constant 0
+return
+label IF_FALSE1
+push this 7
+push constant 0
+gt
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push constant 0
+return
+label IF_FALSE2
+push argument 1
+push this 2
+gt
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push constant 0
+pop this 2
+goto IF_END3
+label IF_FALSE3
+push this 2
+push argument 1
+sub
+pop this 2
+label IF_END3
+call GameConstants.invulnTicks 0
+pop this 7
+push constant 0
+not
+return
+function Player.isAlive 0
+push argument 0
+pop pointer 0
+push this 2
+push constant 0
+gt
+return
+function Player.isMuzzleFlashing 0
+push argument 0
+pop pointer 0
+push this 5
+push constant 0
+gt
+return
+function Player.getX 0
+push argument 0
+pop pointer 0
+push this 0
+return
+function Player.getAimY 0
+push argument 0
+pop pointer 0
+push this 1
+return
+function Player.getHealth 0
+push argument 0
+pop pointer 0
+push this 2
+return
+function Player.getAmmo 0
+push argument 0
+pop pointer 0
+push this 3
+return
+function Player.getRecoilOffset 0
+push argument 0
+pop pointer 0
+push this 6
+return
+function Player.dispose 0
+push argument 0
+pop pointer 0
+push pointer 0
+call Memory.deAlloc 1
+pop temp 0
+push constant 0
+return

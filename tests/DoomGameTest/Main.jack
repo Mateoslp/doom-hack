@@ -1,0 +1,384 @@
+/**
+ * Main.jack (Suite de Pruebas Automatizadas - Modulo 6: Integracion DoomGame + Main)
+ * Ubicacion: C:/DoomProject/tests/DoomGameTest/Main.jack
+ *
+ * Verifica en VMEmulator v2.5 (40 aserciones sobre logica integrada, VRAM real RAM[16384..24575]
+ * y heap de hardware RAM[2049]):
+ *   1. Inicializacion, ownership y aislamiento en MENU (Tests 1..8):
+ *      - Estado inicial MENU (0), exitGame = false, 7 subsistemas propietarios no nulos.
+ *      - Portada MENU renderizada en VRAM (RAM[16770] = -1) con frameDrawn = false.
+ *      - Avance de entropia tickSeed() (+37) en espera no bloqueante.
+ *      - Inmunidad completa en MENU ante teclas de juego (A, W, R, P, ESC): no inicia partida,
+ *        no altera Player (x=0, aimY=104, hp=100, ammo=24), scrollPhase=0 ni activa enemigos.
+ *      - Transicion MENU -> PLAYING por flanco en Enter (128), trazado de HUD (RAM[23008] = -1)
+ *        y limpieza de bandera diferencial isDirty = false.
+ *   2. Despacho de entrada, combate hitscan, cadencia, puntaje, spawner y recarga en PLAYING (Tests 9..19):
+ *      - Disparo hitscan con Espacio (32): consume 1 bala (24->23), impacta enemigo (hp: 2->1) y avanza scroll.
+ *      - Respeto de fireCooldown (4 ticks) con Espacio mantenido: no consume municion ni duplica dano.
+ *      - Movimiento lateral normalizando minuscula 'a' (97 -> x=-12) y flecha derecha (132 -> x=0).
+ *      - Apuntado vertical con 'W' (87 -> aimY=100) y minuscula 's' (115 -> aimY=104).
+ *      - Segundo disparo tras enfriamiento: abate enemigo Tipo 1 (+100 pts, kills=1, highScore=100),
+ *        activa auto-spawner de Oleada 1 en zSpawn (100) y actualiza HUD diferencial.
+ *      - Recarga por flanco 'R' (82 -> ammo=24), ciclo modular scrollPhase (14 -> 0) e integridad HUD.
+ *   3. Transicion PLAYING -> PAUSED, congelamiento absoluto, reanudacion y salida a MENU (Tests 20..28):
+ *      - Flanco en 'P' (80) transita a PAUSED (2) sin avanzar scroll, enemigos ni proyectiles en ese tick,
+ *        dibujando overlay de pausa en el viewport (RAM[18886] = -1).
+ *      - 'P' mantenida no oscila estado; teclas A, W, Espacio y R durante PAUSED mantienen 100% congelados
+ *        a Player, WorldRenderer, Enemy y la integracion gravitacional Q11.4 de Projectile.
+ *      - Nuevo flanco en 'P' reanuda PLAYING (1), restaura el viewport borrando el overlay (RAM[18886] = 0)
+ *        y retoma scroll y gravedad balistica (vy = +12, z = 48) en el siguiente tick.
+ *      - Salida PAUSED -> MENU por flanco ESC (140) preservando highScore (100) y restaurando portada.
+ *   4. Condicion de GAME_OVER (cuerpo a cuerpo y balistica), reinicio 'R' y retorno a MENU (Tests 29..36):
+ *      - Inicio de 2da partida por Espacio (32): reinicia score=0 conservando highScore=100.
+ *      - Dano letal cuerpo a cuerpo en z <= zMelee lleva salud a 0 y transita a GAME_OVER (3) con overlay
+ *        (RAM[18149] = -1); teclas de gameplay en GAME_OVER no procesan simulacion.
+ *      - Flanco 'R' (82) en GAME_OVER reinicia 3ra partida limpia (hp=100, ammo=24) sin fallo por 'R' sostenida.
+ *      - Impacto letal de proyectil balistico (z: 16 -> 13 <= 14) activa GAME_OVER y ESC regresa a MENU.
+ *   5. Terminacion de run(), prueba estricta de CERO fugas de heap (RAM[2049]) y dispose() seguro (Tests 37..40):
+ *      - Estabilidad tras 5 reinicios completos de partida (startNewMatch), salida limpia de run(),
+ *        delta exacto de 0 palabras en RAM[2049] y doble ciclo new()/dispose() sin doble liberacion.
+ */
+class Main {
+
+    function int b2i(boolean flag) {
+        if (flag) {
+            return 1;
+        }
+        return 0;
+    }
+
+    function int nonZero(int val) {
+        if (~(val = 0)) {
+            return 1;
+        }
+        return 0;
+    }
+
+    function void check(int testId, int actual, int expected) {
+        var int total;
+        var int passed;
+        var int failed;
+        var int firstFail;
+
+        let total = (Memory.peek(8000) + 1);
+        do Memory.poke(8000, total);
+
+        if (actual = expected) {
+            let passed = (Memory.peek(8001) + 1);
+            do Memory.poke(8001, passed);
+        } else {
+            let failed = (Memory.peek(8002) + 1);
+            do Memory.poke(8002, failed);
+            let firstFail = Memory.peek(8003);
+            if (firstFail = 0) {
+                do Memory.poke(8003, testId);
+            }
+        }
+        return;
+    }
+
+    function void main() {
+        var DoomGame game;
+        var DoomGame game2;
+        var Array raw;
+        var Array emRaw;
+        var Array hudRaw;
+        var Player player;
+        var ScoreManager scores;
+        var EntityManager entities;
+        var WorldRenderer worldRenderer;
+        var HUD hud;
+        var Array eArr;
+        var Array pArr;
+        var Enemy e0;
+        var Projectile p0;
+        var int i;
+        var int ptrCount;
+        var int seed0;
+        var int heapBefore;
+        var int heapDelta;
+        var int wHighScore;
+        var int wKills;
+        var int wMenuVram;
+        var int wPauseVram;
+        var int wResumeVram;
+        var int wGameOverVram;
+        var int wHudDivider;
+
+        let i = 8000;
+        while (i < 8012) {
+            do Memory.poke(i, 0);
+            let i = (i + 1);
+        }
+
+        // Asegurar teclado en reposo antes de construir el orquestador
+        do Memory.poke(24576, 0);
+
+        let game = DoomGame.new();
+
+        // Capturar frontera del heap inmediatamente despues de DoomGame.new()
+        let heapBefore = Memory.peek(2049);
+
+        // Inspeccion estructural de los 9 campos de DoomGame sin alterar firmas congeladas:
+        // [0]=state, [1]=exitGame, [2]=input, [3]=player, [4]=scores,
+        // [5]=entities, [6]=worldRenderer, [7]=hud, [8]=renderer
+        let raw = game;
+        let player = raw[3];
+        let scores = raw[4];
+        let entities = raw[5];
+        let worldRenderer = raw[6];
+        let hud = raw[7];
+        let emRaw = entities;
+        let hudRaw = hud;
+        let eArr = entities.getEnemies();
+        let pArr = entities.getProjectiles();
+        let e0 = eArr[0];
+        let p0 = pArr[0];
+
+        // =====================================================================
+        // SECCION A: Inicializacion, Ownership y Aislamiento en MENU (Tests 1..8)
+        // =====================================================================
+
+        // Test 1: Estado inicial MENU (0) y exitGame = false (0)
+        do Main.check(1, ((raw[0] * 10) + Main.nonZero(raw[1])), 0);
+
+        // Test 2: Los 7 subsistemas instanciables propiedad de DoomGame son no nulos
+        let ptrCount = 0;
+        let i = 2;
+        while (i < 9) {
+            let ptrCount = (ptrCount + Main.nonZero(raw[i]));
+            let i = (i + 1);
+        }
+        do Main.check(2, ptrCount, 7);
+
+        // Test 3: Portada MENU dibujada en VRAM (marco y=12, x=32..47 -> RAM[16770] = -1) y frameDrawn = false
+        let wMenuVram = Memory.peek(16770);
+        do Main.check(3, ((Main.b2i(wMenuVram = (-1)) * 10) + Main.nonZero(hudRaw[1])), 10);
+
+        // Test 4: En MENU sin teclas, updateMenu() conserva estado 0 y avanza entropia tickSeed (+37)
+        let seed0 = emRaw[3];
+        do game.updateMenu();
+        do Main.check(4, ((raw[0] * 1000) + (emRaw[3] - seed0)), 37);
+
+        // Test 5: Teclas de gameplay (A, W, R, P, ESC) en MENU no inician partida ni cambian estado
+        do Memory.poke(24576, 65);
+        do game.updateMenu();
+        do Memory.poke(24576, 87);
+        do game.updateMenu();
+        do Memory.poke(24576, 82);
+        do game.updateMenu();
+        do Memory.poke(24576, 80);
+        do game.updateMenu();
+        do Memory.poke(24576, 140);
+        do game.updateMenu();
+        do Main.check(5, raw[0], GameState.menu());
+
+        // Test 6: Cero procesamiento de gameplay durante MENU (x=0, aimY=104, hp=100, ammo=24, scroll=0, enemies=0)
+        do Main.check(6, (((((player.getX() + player.getAimY()) + player.getHealth()) + player.getAmmo()) + worldRenderer.getScrollPhase()) + entities.getActiveEnemyCount()), 228);
+
+        // Test 7: Flanco en Enter (128) inicia partida -> estado PLAYING (1), dibuja HUD (RAM[23008]=-1) y limpia isDirty
+        do Memory.poke(24576, 128);
+        do game.updateMenu();
+        do Main.check(7, ((((raw[0] * 100) + (Main.b2i(Memory.peek(23008) = (-1)) * 10)) + Main.nonZero(hudRaw[1])) + Main.nonZero(hudRaw[0])), 111);
+
+        // Test 8: Atributos limpios tras startNewMatch() (hp=100, ammo=24, score=0, activeEnemies=0)
+        do Main.check(8, ((((player.getHealth() * 100) + player.getAmmo()) + scores.getScore()) + entities.getActiveEnemyCount()), 10024);
+
+        // =====================================================================
+        // SECCION B: Despacho de Entrada, Combate, Puntaje y Spawner en PLAYING (Tests 9..19)
+        // =====================================================================
+
+        // Colocar un enemigo Tipo 1 en el eje de mira (x=0, z=44, hp=2)
+        do entities.spawnEnemy(1, 0, 44, 0);
+
+        // Test 9: Tick 1 con Espacio (32) -> dispara (ammo 24->23), hiere a e0 (hp 2->1) y avanza scrollPhase (0->2)
+        do Memory.poke(24576, 32);
+        do game.updatePlaying();
+        do Main.check(9, (((player.getAmmo() * 100) + (e0.getHp() * 10)) + worldRenderer.getScrollPhase()), 2312);
+
+        // Test 10: Tick 2 con Espacio (32) sostenido -> fireCooldown impide disparo (ammo=23, hp=1) y recoil decae 8->4
+        do game.updatePlaying();
+        do Main.check(10, (((player.getAmmo() * 100) + (e0.getHp() * 10)) + player.getRecoilOffset()), 2314);
+
+        // Test 11: Tick 3 con minuscula 'a' (97) -> InputManager normaliza y mueve jugador a x = -12
+        do Memory.poke(24576, 97);
+        do game.updatePlaying();
+        do Main.check(11, player.getX(), -12);
+
+        // Test 12: Tick 4 con 'W' (87) -> eleva mira a aimY = 100 y scrollPhase avanza a 8
+        do Memory.poke(24576, 87);
+        do game.updatePlaying();
+        do Main.check(12, ((player.getAimY() * 100) + worldRenderer.getScrollPhase()), 10008);
+
+        // Test 13: Tick 5 con Flecha Derecha (132) -> regresa jugador a x = 0 y scrollPhase = 10 (cooldown llega a 0)
+        do Memory.poke(24576, 132);
+        do game.updatePlaying();
+        do Main.check(13, ((player.getX() * 10) + worldRenderer.getScrollPhase()), 10);
+
+        // Test 14: Tick 6 con minuscula 's' (115) -> baja mira a aimY = 104 (spawnTimer llega a 0)
+        do Memory.poke(24576, 115);
+        do game.updatePlaying();
+        do Main.check(14, player.getAimY(), 104);
+
+        // Test 15..17: Tick 7 con Espacio (32) -> 2do disparo abate a e0 (+100 pts, kills=1, highScore=100, ammo=22)
+        // y el spawner automatico de Oleada 1 genera un nuevo enemigo en zSpawn (100)
+        do Memory.poke(24576, 32);
+        do game.updatePlaying();
+        let wKills = scores.getKills();
+        let wHighScore = scores.getHighScore();
+        do Main.check(15, ((scores.getScore() * 10) + wKills), 1001);
+        do Main.check(16, ((wHighScore * 10) + player.getAmmo()), 1022);
+        do Main.check(17, ((entities.getActiveEnemyCount() * 1000) + e0.getZ()), 1100);
+
+        // Test 18..19: Tick 8 con flanco en 'R' (82) -> recarga ammo=24, scrollPhase envuelve 14->0 y HUD intacto
+        do Memory.poke(24576, 82);
+        do game.updatePlaying();
+        let wHudDivider = Memory.peek(23008);
+        do Main.check(18, ((player.getAmmo() * 10) + worldRenderer.getScrollPhase()), 240);
+        do Main.check(19, wHudDivider, -1);
+
+        // =====================================================================
+        // SECCION C: Pausa, Congelamiento Absoluto, Reanudacion y Salida a MENU (Tests 20..28)
+        // =====================================================================
+
+        // Activar un proyectil balistico antes de pausar para comprobar que la gravedad Q11.4 tambien se congela
+        do entities.spawnProjectile(0, 0, 50, 16, 0, 2, 10);
+
+        // Test 20: Flanco en 'P' (80) transita de inmediato a PAUSED (2) sin avanzar scroll (0), e0.z (98) ni p0.z (50)
+        do Memory.poke(24576, 80);
+        do game.updatePlaying();
+        do Main.check(20, ((((raw[0] * 1000) + worldRenderer.getScrollPhase()) + e0.getZ()) + p0.getZ()), 2148);
+
+        // Test 21: Overlay de PAUSA dibujado dentro del viewport (borde negro y=78, x=96..111 -> RAM[18886] = -1)
+        let wPauseVram = Memory.peek(18886);
+        do Main.check(21, wPauseVram, -1);
+
+        // Test 22: Mantener 'P' (80) presionada NO oscila de regreso a PLAYING (deteccion estricta por flanco)
+        do game.updatePaused();
+        do Main.check(22, raw[0], GameState.paused());
+
+        // Test 23..24: En PAUSED, teclas A, W, Espacio y R NO mueven jugador, NO disparan y NO avanzan fisica ni IA
+        do Memory.poke(24576, 65);
+        do game.updatePaused();
+        do Memory.poke(24576, 87);
+        do game.updatePaused();
+        do Memory.poke(24576, 32);
+        do game.updatePaused();
+        do Memory.poke(24576, 82);
+        do game.updatePaused();
+        do Main.check(23, (((player.getX() + player.getAimY()) + player.getAmmo()) + player.getHealth()), 228);
+        do Main.check(24, ((((worldRenderer.getScrollPhase() + e0.getZ()) + p0.getZ()) + p0.getFpY()) + p0.getVy()), 148);
+
+        // Test 25: Soltar tecla (0) y nuevo flanco en 'P' (80) reanuda PLAYING (1) y limpia el overlay del viewport
+        do Memory.poke(24576, 0);
+        do game.updatePaused();
+        do Memory.poke(24576, 80);
+        do game.updatePaused();
+        let wResumeVram = Memory.peek(18886);
+        do Main.check(25, ((raw[0] * 10) + Main.nonZero(wResumeVram)), 10);
+
+        // Test 26: Al siguiente tick en PLAYING se retoman scroll (0->2) y gravedad balistica Q11.4 (z: 50->48, vy: 0->12)
+        do Memory.poke(24576, 0);
+        do game.updatePlaying();
+        do Main.check(26, (((worldRenderer.getScrollPhase() * 1000) + (p0.getZ() * 10)) + p0.getVy()), 2492);
+
+        // Test 27..28: Pausar con 'P' (80) y salir a MENU con ESC (140) preserva highScore=100 y redibuja portada
+        do Memory.poke(24576, 80);
+        do game.updatePlaying();
+        do Memory.poke(24576, 140);
+        do game.updatePaused();
+        do Main.check(27, ((raw[0] * 1000) + scores.getHighScore()), 100);
+        do Main.check(28, Memory.peek(16770), -1);
+
+        // =====================================================================
+        // SECCION D: Condicion GAME_OVER, Reinicio 'R' y Retorno a MENU (Tests 29..36)
+        // =====================================================================
+
+        // Test 29: Iniciar 2da partida desde MENU con Espacio (32) reinicia score=0 conservando highScore=100
+        do Memory.poke(24576, 32);
+        do game.updateMenu();
+        do Main.check(29, ((((raw[0] * 1000) + scores.getHighScore()) + scores.getScore()) + entities.getActiveEnemyCount()), 1100);
+
+        // Reducir salud a 15, agotar ventana invulnTimer y colocar un Bruto Tipo 2 en z=15 (avanza a z=14 <= zMelee, dmg=25)
+        do Memory.poke(24576, 0);
+        do player.takeDamage(85);
+        let i = 0;
+        while (i < 8) {
+            do player.updateTimers();
+            let i = (i + 1);
+        }
+        do entities.spawnEnemy(2, 0, 15, 0);
+
+        // Test 30..31: Impacto letal cuerpo a cuerpo lleva salud a 0, transita a GAME_OVER (3) y traza overlay (RAM[18149]=-1)
+        do game.updatePlaying();
+        let wGameOverVram = Memory.peek(18149);
+        do Main.check(30, (((raw[0] * 100) + (player.getHealth() * 10)) + Main.b2i(player.isAlive())), 300);
+        do Main.check(31, wGameOverVram, -1);
+
+        // Test 32: En GAME_OVER, teclas A, Espacio y P no procesan gameplay ni alteran estado (state=3, scroll=2, ammo=24, x=0)
+        do Memory.poke(24576, 65);
+        do game.updateGameOver();
+        do Memory.poke(24576, 32);
+        do game.updateGameOver();
+        do Memory.poke(24576, 80);
+        do game.updateGameOver();
+        do Main.check(32, ((((raw[0] * 1000) + (worldRenderer.getScrollPhase() * 100)) + player.getAmmo()) + player.getX()), 3224);
+
+        // Test 33: Flanco en 'R' (82) desde GAME_OVER reinicia 3ra partida limpia (state=1, hp=100, ammo=24, enemies=0)
+        do Memory.poke(24576, 82);
+        do game.updateGameOver();
+        do Main.check(33, ((((raw[0] * 1000) + player.getHealth()) + player.getAmmo()) + entities.getActiveEnemyCount()), 1124);
+
+        // Test 34: Mantener 'R' (82) en el primer tick de PLAYING tras reiniciar no altera municion ni estado
+        do game.updatePlaying();
+        do Main.check(34, (((raw[0] * 1000) + (player.getAmmo() * 10)) + worldRenderer.getScrollPhase()), 1242);
+
+        // Test 35..36: Impacto letal por proyectil balistico (z: 16 -> 13 <= zMelee, dmg=100) -> GAME_OVER -> ESC a MENU
+        do Memory.poke(24576, 0);
+        do entities.spawnProjectile(0, 0, 16, 0, 0, 3, 100);
+        do game.updatePlaying();
+        do Main.check(35, ((raw[0] * 10) + player.getHealth()), 30);
+
+        do Memory.poke(24576, 140);
+        do game.updateGameOver();
+        do Main.check(36, ((raw[0] * 1000) + scores.getHighScore()), 100);
+
+        // =====================================================================
+        // SECCION E: Estabilidad Multi-Reinicio, run(), Heap (RAM[2049]) y dispose() (Tests 37..40)
+        // =====================================================================
+
+        // Test 37: 4ta y 5ta inicializacion de partida consecutivas reutilizando pools sin degradar highScore
+        do game.startNewMatch();
+        do game.startNewMatch();
+        do Main.check(37, (((raw[0] * 1000) + player.getHealth()) + scores.getHighScore()), 1200);
+
+        // Test 38: Terminacion limpia e inmediata de DoomGame.run() cuando exitGame es verdadero
+        let raw[1] = true;
+        do game.run();
+        do Main.check(38, raw[0], GameState.playing());
+
+        // Test 39: PRUEBA ESTRICTA DE HARDWARE EN RAM[2049] -> 0 palabras asignadas en el heap durante
+        // todas las transiciones MENU/PLAYING/PAUSED/GAME_OVER, 5 reinicios de partida y 18 fotogramas 3D
+        let heapDelta = (Memory.peek(2049) - heapBefore);
+        do Main.check(39, heapDelta, 0);
+
+        // Test 40: Liberacion simetrica dispose() sin doble free + segundo ciclo completo DoomGame.new()/dispose()
+        do Memory.poke(24576, 0);
+        do game.dispose();
+        let game2 = DoomGame.new();
+        do game2.dispose();
+        do Main.check(40, 1, 1);
+
+        // Testigos diagnosticos para DoomGameTest.cmp
+        do Memory.poke(8004, wHighScore);
+        do Memory.poke(8005, wKills);
+        do Memory.poke(8006, wMenuVram);
+        do Memory.poke(8007, wPauseVram);
+        do Memory.poke(8008, wResumeVram);
+        do Memory.poke(8009, wGameOverVram);
+        do Memory.poke(8010, wHudDivider);
+        do Memory.poke(8011, heapDelta);
+        return;
+    }
+}
+

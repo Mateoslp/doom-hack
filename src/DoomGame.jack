@@ -1,0 +1,249 @@
+/**
+ * DoomGame.jack
+ * Controlador y orquestador principal de HELLGATE 16: administra el ciclo de vida
+ * de todos los subsistemas, ejecuta el bucle principal no bloqueante y coordina
+ * la maquina de estados global (MENU, PLAYING, PAUSED, GAME_OVER)
+ * (Modulo 6 del Plan Modular de Desarrollo / Capa 5 / Ficha Tecnica #16).
+ *
+ * Orden exacto de ejecucion por tick en PLAYING:
+ *   1. Sondeo no bloqueante de teclado (input.poll).
+ *   2. Verificacion prioritaria de pausa por flanco (P -> PAUSED).
+ *   3. Actualizacion temporal del jugador (player.updateTimers - Contrato #2).
+ *   4. Despacho de movimiento, mira, recarga y disparo hitscan (Contratos #1, #4, #5).
+ *   5. Avance continuo de la fase del corredor pseudo-3D (worldRenderer.advanceScroll).
+ *   6. Actualizacion de enemigos/oleadas y fisica balistica Q11.4 (Contrato #3).
+ *   7. Resolucion de disparos enemigos, impactos al jugador y condicion GAME_OVER.
+ *   8. Renderizado de escena activa en orden pintor y HUD diferencial (Contratos #6, #7).
+ *
+ * Propiedad de memoria: construye una sola vez los 7 subsistemas con estado en new(),
+ * reutiliza todo sin asignar memoria en startNewMatch() y el game loop, y libera
+ * cada subsistema exactamente una vez en dispose() sin doble liberacion.
+ */
+class DoomGame {
+
+    field int state;
+    field boolean exitGame;
+    field InputManager input;
+    field Player player;
+    field ScoreManager scores;
+    field EntityManager entities;
+    field WorldRenderer worldRenderer;
+    field HUD hud;
+    field Renderer renderer;
+
+    /** Inicializa todos los subsistemas del juego y presenta la portada MENU. */
+    constructor DoomGame new() {
+        let input = InputManager.new();
+        let player = Player.new();
+        let scores = ScoreManager.new();
+        let entities = EntityManager.new();
+        let worldRenderer = WorldRenderer.new();
+        let hud = HUD.new();
+        let renderer = Renderer.new(worldRenderer, hud);
+
+        let state = GameState.menu();
+        let exitGame = false;
+
+        do hud.renderMenuScreen(scores.getHighScore());
+        return this;
+    }
+
+    /**
+     * Ejecuta el bucle principal continuo despachando la logica segun el estado actual
+     * y regulando la cadencia con Sys.wait(frameDelayMs = 25).
+     */
+    method void run() {
+        while (~exitGame) {
+            if (state = GameState.menu()) {
+                do updateMenu();
+            } else {
+                if (state = GameState.playing()) {
+                    do updatePlaying();
+                } else {
+                    if (state = GameState.paused()) {
+                        do updatePaused();
+                    } else {
+                        do updateGameOver();
+                    }
+                }
+            }
+
+            if (~exitGame) {
+                do Sys.wait(GameConstants.frameDelayMs());
+            }
+        }
+        return;
+    }
+
+    /**
+     * Reinicia una partida limpia reutilizando las instancias y pools existentes
+     * (cero llamadas a Memory.alloc), transita a PLAYING y dibuja el primer frame.
+     */
+    method void startNewMatch() {
+        do player.reset();
+        do scores.reset();
+        do entities.reset();
+        do worldRenderer.reset();
+        do hud.resetFrame();
+
+        let state = GameState.playing();
+        do renderer.renderPlayingFrame(player, entities, scores);
+        return;
+    }
+
+    /**
+     * [Interno] Estado MENU: muestrea teclado sin bloqueo, avanza la entropia de la
+     * semilla pseudoaleatoria e inicia partida al detectar flanco en Espacio o Enter.
+     */
+    method void updateMenu() {
+        do input.poll();
+        do entities.tickSeed();
+
+        if (input.isStartTriggered()) {
+            do startNewMatch();
+        }
+        return;
+    }
+
+    /**
+     * [Interno] Estado PLAYING: ejecuta las 8 fases del ciclo de simulacion y
+     * renderizado, marcando hud.markDirty() unicamente ante cambios efectivos.
+     */
+    method void updatePlaying() {
+        do input.poll();
+
+        // Transicion inmediata a PAUSED sin avanzar fisica ni entidades en este tick
+        if (input.isPauseTriggered()) {
+            let state = GameState.paused();
+            do hud.renderPauseOverlay();
+            do hud.markDirty();
+            do hud.updateIfNeeded(player, scores, state);
+            return;
+        }
+
+        // Contrato #2: actualizar temporizadores del jugador 1 vez por tick antes de acciones
+        do player.updateTimers();
+
+        // Contrato #1: traducir predicados de InputManager en comandos sobre Player
+        if (input.isMoveLeftHeld()) {
+            do player.moveLeft();
+        }
+        if (input.isMoveRightHeld()) {
+            do player.moveRight();
+        }
+        if (input.isAimUpHeld()) {
+            do player.aimUp();
+        }
+        if (input.isAimDownHeld()) {
+            do player.aimDown();
+        }
+
+        if (input.isReloadTriggered()) {
+            if (player.reload()) {
+                do hud.markDirty();
+            }
+        }
+
+        if (input.isFireHeld()) {
+            if (player.tryFire()) {
+                do hud.markDirty();
+                do CollisionManager.resolvePlayerShot(player, entities, scores);
+            }
+        }
+
+        // Avance continuo del escenario pseudo-3D y simulacion de entidades + fisica Q11.4
+        do worldRenderer.advanceScroll(2);
+        do entities.updateEntities(scores.getWave());
+        do entities.updateProjectilesPhysics();
+
+        // Interacciones enemigas hacia el jugador y verificacion de derrota (GAME_OVER)
+        if (CollisionManager.resolveWorldInteractions(player, entities)) {
+            do hud.markDirty();
+        }
+
+        if (~(player.isAlive())) {
+            let state = GameState.gameOver();
+            do renderer.renderPlayingFrame(player, entities, scores);
+            do hud.renderGameOverOverlay(scores);
+            do hud.updateIfNeeded(player, scores, state);
+            return;
+        }
+
+        // Renderizado completo en orden pintor y sincronizacion diferencial del HUD
+        do renderer.renderPlayingFrame(player, entities, scores);
+        return;
+    }
+
+    /**
+     * [Interno] Estado PAUSED: congela por completo entidades, fisica y temporizadores;
+     * solo atiende flancos de P (reanudar restaurando viewport) o ESC (volver a MENU).
+     */
+    method void updatePaused() {
+        do input.poll();
+
+        if (input.isPauseTriggered()) {
+            let state = GameState.playing();
+            do hud.markDirty();
+            do renderer.renderPlayingFrame(player, entities, scores);
+            return;
+        }
+
+        if (input.isMenuExitTriggered()) {
+            let state = GameState.menu();
+            do hud.renderMenuScreen(scores.getHighScore());
+            return;
+        }
+        return;
+    }
+
+    /**
+     * [Interno] Estado GAME_OVER: escena detenida con resumen de partida; atiende
+     * flancos de R (reiniciar nueva partida limpia) o ESC (regresar a MENU).
+     */
+    method void updateGameOver() {
+        do input.poll();
+
+        if (input.isRestartTriggered()) {
+            do startNewMatch();
+            return;
+        }
+
+        if (input.isMenuExitTriggered()) {
+            let state = GameState.menu();
+            do hud.renderMenuScreen(scores.getHighScore());
+            return;
+        }
+        return;
+    }
+
+    /**
+     * Libera ordenadamente todos los subsistemas propiedad de DoomGame en orden
+     * inverso de dependencia (sin doble dispose) y finalmente esta instancia.
+     */
+    method void dispose() {
+        if (~(renderer = null)) {
+            do renderer.dispose();
+        }
+        if (~(hud = null)) {
+            do hud.dispose();
+        }
+        if (~(worldRenderer = null)) {
+            do worldRenderer.dispose();
+        }
+        if (~(entities = null)) {
+            do entities.dispose();
+        }
+        if (~(scores = null)) {
+            do scores.dispose();
+        }
+        if (~(player = null)) {
+            do player.dispose();
+        }
+        if (~(input = null)) {
+            do input.dispose();
+        }
+        do Memory.deAlloc(this);
+        return;
+    }
+}
+

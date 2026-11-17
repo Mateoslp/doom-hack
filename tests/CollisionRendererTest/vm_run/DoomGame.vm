@@ -1,0 +1,459 @@
+function DoomGame.new 0
+push constant 9
+call Memory.alloc 1
+pop pointer 0
+call InputManager.new 0
+pop this 2
+call Player.new 0
+pop this 3
+call ScoreManager.new 0
+pop this 4
+call EntityManager.new 0
+pop this 5
+call WorldRenderer.new 0
+pop this 6
+call HUD.new 0
+pop this 7
+push this 6
+push this 7
+call Renderer.new 2
+pop this 8
+call GameState.menu 0
+pop this 0
+push constant 0
+pop this 1
+push this 7
+push this 4
+call ScoreManager.getHighScore 1
+call HUD.renderMenuScreen 2
+pop temp 0
+push pointer 0
+return
+function DoomGame.run 0
+push argument 0
+pop pointer 0
+label WHILE_EXP0
+push this 1
+not
+not
+if-goto WHILE_END0
+push this 0
+call GameState.menu 0
+eq
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push pointer 0
+call DoomGame.updateMenu 1
+pop temp 0
+goto IF_END0
+label IF_FALSE0
+push this 0
+call GameState.playing 0
+eq
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push pointer 0
+call DoomGame.updatePlaying 1
+pop temp 0
+goto IF_END1
+label IF_FALSE1
+push this 0
+call GameState.paused 0
+eq
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push pointer 0
+call DoomGame.updatePaused 1
+pop temp 0
+goto IF_END2
+label IF_FALSE2
+push pointer 0
+call DoomGame.updateGameOver 1
+pop temp 0
+label IF_END2
+label IF_END1
+label IF_END0
+push this 1
+not
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+call GameConstants.frameDelayMs 0
+call Sys.wait 1
+pop temp 0
+label IF_FALSE3
+goto WHILE_EXP0
+label WHILE_END0
+push constant 0
+return
+function DoomGame.startNewMatch 0
+push argument 0
+pop pointer 0
+push this 3
+call Player.reset 1
+pop temp 0
+push this 4
+call ScoreManager.reset 1
+pop temp 0
+push this 5
+call EntityManager.reset 1
+pop temp 0
+push this 6
+call WorldRenderer.reset 1
+pop temp 0
+push this 7
+call HUD.resetFrame 1
+pop temp 0
+call GameState.playing 0
+pop this 0
+push this 8
+push this 3
+push this 5
+push this 4
+call Renderer.renderPlayingFrame 4
+pop temp 0
+push constant 0
+return
+function DoomGame.updateMenu 0
+push argument 0
+pop pointer 0
+push this 2
+call InputManager.poll 1
+pop temp 0
+push this 5
+call EntityManager.tickSeed 1
+pop temp 0
+push this 2
+call InputManager.isStartTriggered 1
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push pointer 0
+call DoomGame.startNewMatch 1
+pop temp 0
+label IF_FALSE0
+push constant 0
+return
+function DoomGame.updatePlaying 0
+push argument 0
+pop pointer 0
+push this 2
+call InputManager.poll 1
+pop temp 0
+push this 2
+call InputManager.isPauseTriggered 1
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+call GameState.paused 0
+pop this 0
+push this 7
+call HUD.renderPauseOverlay 1
+pop temp 0
+push this 7
+call HUD.markDirty 1
+pop temp 0
+push this 7
+push this 3
+push this 4
+push this 0
+call HUD.updateIfNeeded 4
+pop temp 0
+push constant 0
+return
+label IF_FALSE0
+push this 3
+call Player.updateTimers 1
+pop temp 0
+push this 2
+call InputManager.isMoveLeftHeld 1
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push this 3
+call Player.moveLeft 1
+pop temp 0
+label IF_FALSE1
+push this 2
+call InputManager.isMoveRightHeld 1
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push this 3
+call Player.moveRight 1
+pop temp 0
+label IF_FALSE2
+push this 2
+call InputManager.isAimUpHeld 1
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push this 3
+call Player.aimUp 1
+pop temp 0
+label IF_FALSE3
+push this 2
+call InputManager.isAimDownHeld 1
+if-goto IF_TRUE4
+goto IF_FALSE4
+label IF_TRUE4
+push this 3
+call Player.aimDown 1
+pop temp 0
+label IF_FALSE4
+push this 2
+call InputManager.isReloadTriggered 1
+if-goto IF_TRUE5
+goto IF_FALSE5
+label IF_TRUE5
+push this 3
+call Player.reload 1
+if-goto IF_TRUE6
+goto IF_FALSE6
+label IF_TRUE6
+push this 7
+call HUD.markDirty 1
+pop temp 0
+label IF_FALSE6
+label IF_FALSE5
+push this 2
+call InputManager.isFireHeld 1
+if-goto IF_TRUE7
+goto IF_FALSE7
+label IF_TRUE7
+push this 3
+call Player.tryFire 1
+if-goto IF_TRUE8
+goto IF_FALSE8
+label IF_TRUE8
+push this 7
+call HUD.markDirty 1
+pop temp 0
+push this 3
+push this 5
+push this 4
+call CollisionManager.resolvePlayerShot 3
+pop temp 0
+label IF_FALSE8
+label IF_FALSE7
+push this 6
+push constant 2
+call WorldRenderer.advanceScroll 2
+pop temp 0
+push this 5
+push this 4
+call ScoreManager.getWave 1
+call EntityManager.updateEntities 2
+pop temp 0
+push this 5
+call EntityManager.updateProjectilesPhysics 1
+pop temp 0
+push this 3
+push this 5
+call CollisionManager.resolveWorldInteractions 2
+if-goto IF_TRUE9
+goto IF_FALSE9
+label IF_TRUE9
+push this 7
+call HUD.markDirty 1
+pop temp 0
+label IF_FALSE9
+push this 3
+call Player.isAlive 1
+not
+if-goto IF_TRUE10
+goto IF_FALSE10
+label IF_TRUE10
+call GameState.gameOver 0
+pop this 0
+push this 8
+push this 3
+push this 5
+push this 4
+call Renderer.renderPlayingFrame 4
+pop temp 0
+push this 7
+push this 4
+call HUD.renderGameOverOverlay 2
+pop temp 0
+push this 7
+push this 3
+push this 4
+push this 0
+call HUD.updateIfNeeded 4
+pop temp 0
+push constant 0
+return
+label IF_FALSE10
+push this 8
+push this 3
+push this 5
+push this 4
+call Renderer.renderPlayingFrame 4
+pop temp 0
+push constant 0
+return
+function DoomGame.updatePaused 0
+push argument 0
+pop pointer 0
+push this 2
+call InputManager.poll 1
+pop temp 0
+push this 2
+call InputManager.isPauseTriggered 1
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+call GameState.playing 0
+pop this 0
+push this 7
+call HUD.markDirty 1
+pop temp 0
+push this 8
+push this 3
+push this 5
+push this 4
+call Renderer.renderPlayingFrame 4
+pop temp 0
+push constant 0
+return
+label IF_FALSE0
+push this 2
+call InputManager.isMenuExitTriggered 1
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+call GameState.menu 0
+pop this 0
+push this 7
+push this 4
+call ScoreManager.getHighScore 1
+call HUD.renderMenuScreen 2
+pop temp 0
+push constant 0
+return
+label IF_FALSE1
+push constant 0
+return
+function DoomGame.updateGameOver 0
+push argument 0
+pop pointer 0
+push this 2
+call InputManager.poll 1
+pop temp 0
+push this 2
+call InputManager.isRestartTriggered 1
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push pointer 0
+call DoomGame.startNewMatch 1
+pop temp 0
+push constant 0
+return
+label IF_FALSE0
+push this 2
+call InputManager.isMenuExitTriggered 1
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+call GameState.menu 0
+pop this 0
+push this 7
+push this 4
+call ScoreManager.getHighScore 1
+call HUD.renderMenuScreen 2
+pop temp 0
+push constant 0
+return
+label IF_FALSE1
+push constant 0
+return
+function DoomGame.dispose 0
+push argument 0
+pop pointer 0
+push this 8
+push constant 0
+eq
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push this 8
+call Renderer.dispose 1
+pop temp 0
+label IF_FALSE0
+push this 7
+push constant 0
+eq
+not
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push this 7
+call HUD.dispose 1
+pop temp 0
+label IF_FALSE1
+push this 6
+push constant 0
+eq
+not
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push this 6
+call WorldRenderer.dispose 1
+pop temp 0
+label IF_FALSE2
+push this 5
+push constant 0
+eq
+not
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push this 5
+call EntityManager.dispose 1
+pop temp 0
+label IF_FALSE3
+push this 4
+push constant 0
+eq
+not
+if-goto IF_TRUE4
+goto IF_FALSE4
+label IF_TRUE4
+push this 4
+call ScoreManager.dispose 1
+pop temp 0
+label IF_FALSE4
+push this 3
+push constant 0
+eq
+not
+if-goto IF_TRUE5
+goto IF_FALSE5
+label IF_TRUE5
+push this 3
+call Player.dispose 1
+pop temp 0
+label IF_FALSE5
+push this 2
+push constant 0
+eq
+not
+if-goto IF_TRUE6
+goto IF_FALSE6
+label IF_TRUE6
+push this 2
+call InputManager.dispose 1
+pop temp 0
+label IF_FALSE6
+push pointer 0
+call Memory.deAlloc 1
+pop temp 0
+push constant 0
+return

@@ -1,0 +1,153 @@
+/**
+ * Main.jack (Suite de Pruebas Automatizadas del Modulo 1 - Fundacional)
+ * Ubicacion: C:/DoomProject/tests/Module1Test/Main.jack
+ *
+ * Verifica en VMEmulator:
+ *   1. GameConstants (resolucion, particion 0..206 / 207..208 / 209..255, pools, Q11.4, rebote 7/8).
+ *   2. GameState (estado inicial MENU=0, lectura, asignacion en variable de estado y 4 estados).
+ *   3. MathUtils (+ interoperabilidad con Math.abs/min/max, clamp, Q11.4 toFixed/fromFixed,
+ *      negativos, truncamiento, saturacion anti-overflow en 16 bits, mod y proyeccion 2.5D).
+ *
+ * Registro de resultados en RAM:
+ *   RAM[8000] = total de pruebas ejecutadas (44)
+ *   RAM[8001] = pruebas aprobadas (44)
+ *   RAM[8002] = pruebas fallidas (0)
+ *   RAM[8003] = ID de la primera prueba fallida (0 si todas aprueban)
+ *   RAM[8004..8011] = testigos numericos clave para comparacion .cmp
+ */
+class Main {
+
+    function void check(int testId, int actual, int expected) {
+        var int total;
+        var int passed;
+        var int failed;
+        var int firstFail;
+
+        let total = Memory.peek(8000) + 1;
+        do Memory.poke(8000, total);
+
+        if (actual = expected) {
+            let passed = Memory.peek(8001) + 1;
+            do Memory.poke(8001, passed);
+        } else {
+            let failed = Memory.peek(8002) + 1;
+            do Memory.poke(8002, failed);
+            let firstFail = Memory.peek(8003);
+            if (firstFail = 0) {
+                do Memory.poke(8003, testId);
+            }
+        }
+        return;
+    }
+
+    function void main() {
+        var int minInt16;
+        var int stateVar;
+        var int uniqOk;
+
+        // Inicializar contadores en RAM[8000..8003]
+        do Memory.poke(8000, 0);
+        do Memory.poke(8001, 0);
+        do Memory.poke(8002, 0);
+        do Memory.poke(8003, 0);
+
+        // Representacion segura de -32768 en Jack
+        let minInt16 = ((-32767) - 1);
+
+        // =====================================================================
+        // SUITE 1: GameConstants (Tests 1..12)
+        // =====================================================================
+        do Main.check(1, GameConstants.screenWidth(), 512);
+        do Main.check(2, GameConstants.screenHeight(), 256);
+        do Main.check(3, GameConstants.viewportTop(), 0);
+        do Main.check(4, GameConstants.viewportBottom(), 206);
+        do Main.check(5, (GameConstants.hudDividerY() - GameConstants.viewportBottom()), 1);
+        do Main.check(6, GameConstants.hudDividerBottom(), 208);
+        do Main.check(7, (GameConstants.hudTop() - GameConstants.hudDividerBottom()), 1);
+        do Main.check(8, (GameConstants.screenHeight() - GameConstants.hudBottom()), 1);
+        do Main.check(9, GameConstants.maxEnemies(), 4);
+        do Main.check(10, GameConstants.maxProjectiles(), 5);
+        do Main.check(11, ((GameConstants.fpScale() * 100) + GameConstants.gravity()), 1612);
+        do Main.check(12, ((GameConstants.restitutionNum() * 10) + GameConstants.restitutionDen()), 78);
+
+        // =====================================================================
+        // SUITE 2: GameState (Tests 13..18)
+        // =====================================================================
+        // Estado inicial segun GDD: MENU (0)
+        let stateVar = GameState.menu();
+        do Main.check(13, stateVar, 0);
+        do Main.check(14, GameState.playing(), 1);
+        do Main.check(15, GameState.paused(), 2);
+        do Main.check(16, GameState.gameOver(), 3);
+
+        // Modificacion y lectura sobre variable portadora de estado
+        let stateVar = GameState.playing();
+        let stateVar = (stateVar * 10) + GameState.paused();
+        let stateVar = (stateVar * 10) + GameState.gameOver();
+        do Main.check(17, stateVar, 123);
+
+        // Unicidad estricta de los 4 estados validos
+        let uniqOk = 0;
+        if ((GameState.menu() < GameState.playing()) &
+            (GameState.playing() < GameState.paused()) &
+            (GameState.paused() < GameState.gameOver())) {
+            let uniqOk = 1;
+        }
+        do Main.check(18, uniqOk, 1);
+
+        // =====================================================================
+        // SUITE 3: MathUtils + interoperabilidad Math estandar (Tests 19..44)
+        // =====================================================================
+        do Main.check(19, (Math.abs(-160) + Math.abs(0)), 160);
+        do Main.check(20, (Math.max(-32767, 32767) + Math.min(-32767, 32767)), 0);
+
+        // clamp: dentro, cero, negativos, fuera y extremos 16-bit
+        do Main.check(21, MathUtils.clamp(50, -160, 160), 50);
+        do Main.check(22, MathUtils.clamp(0, -160, 160), 0);
+        do Main.check(23, MathUtils.clamp(-75, -160, 160), -75);
+        do Main.check(24, MathUtils.clamp(-500, -160, 160), -160);
+        do Main.check(25, MathUtils.clamp(500, -160, 160), 160);
+        do Main.check(26, (MathUtils.clamp(32767, -2047, 2047) + MathUtils.clamp(minInt16, -2047, 2047)), 0);
+
+        // Punto fijo Q11.4: toFixed (positivos, cero, negativos, limites y saturacion)
+        do Main.check(27, MathUtils.toFixed(0), 0);
+        do Main.check(28, MathUtils.toFixed(160), GameConstants.fpMaxX());
+        do Main.check(29, MathUtils.toFixed(-90), GameConstants.fpCeilY());
+        do Main.check(30, MathUtils.toFixed(2047), 32752);
+        do Main.check(31, MathUtils.toFixed(-2047), -32752);
+        do Main.check(32, MathUtils.toFixed(2048), 32752);
+        do Main.check(33, MathUtils.toFixed(minInt16), -32752);
+
+        // Punto fijo Q11.4: fromFixed (exactos, truncamiento positivo/negativo, extremos)
+        do Main.check(34, (MathUtils.fromFixed(2560) + MathUtils.fromFixed(-1440)), 70);
+        do Main.check(35, ((MathUtils.fromFixed(23) * 10) + MathUtils.fromFixed(15)), 10);
+        do Main.check(36, ((MathUtils.fromFixed(-23) * 10) + MathUtils.fromFixed(-15)), -10);
+        do Main.check(37, MathUtils.fromFixed(minInt16), -2048);
+
+        // absDiff: normales, cero y saturacion anti-overflow en extremos opuestos
+        do Main.check(38, (MathUtils.absDiff(-160, 160) + MathUtils.absDiff(0, 0)), 320);
+        do Main.check(39, MathUtils.absDiff(20000, -20000), 32767);
+
+        // mod: positivo, cero, negativo y guarda b <= 0
+        do Main.check(40, ((MathUtils.mod(18, 16) * 100) + MathUtils.mod(-3, 16) + MathUtils.mod(10, 0)), 213);
+
+        // Proyeccion 2.5D y paralaje
+        do Main.check(41, ((MathUtils.computeVanishingX(160) + MathUtils.computeVanishingX(-160)) / 2), 256);
+        do Main.check(42, MathUtils.projectX(160, -160, 296, 64), 616);
+        do Main.check(43, (MathUtils.projectY(90, 104, 64) + MathUtils.projectY(-90, 104, 64)), 208);
+        do Main.check(44, (MathUtils.projectSize(32, 64) + MathUtils.projectSize(32, 32)), 96);
+
+        // Escribir testigos directos en RAM[8004..8011] para verificacion explicita
+        do Memory.poke(8004, MathUtils.toFixed(2047));
+        do Memory.poke(8005, MathUtils.toFixed(-2047));
+        do Memory.poke(8006, MathUtils.fromFixed(-23));
+        do Memory.poke(8007, MathUtils.fromFixed(minInt16));
+        do Memory.poke(8008, MathUtils.absDiff(20000, -20000));
+        do Memory.poke(8009, MathUtils.mod(-3, 16));
+        do Memory.poke(8010, MathUtils.projectX(160, -160, 296, 64));
+        do Memory.poke(8011, MathUtils.projectX(16, 0, 256, 0));
+
+        return;
+    }
+}
+

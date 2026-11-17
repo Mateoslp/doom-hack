@@ -1,0 +1,312 @@
+/**
+ * Main.jack (Suite de Pruebas Automatizadas - Capa 1: InputManager y ScoreManager)
+ * Ubicacion: C:/DoomProject/tests/InputScoreTest/Main.jack
+ *
+ * Verifica en VMEmulator v2.5:
+ *   1. InputManager: captura no bloqueante desde RAM[24576] (inyectada por .tst y por
+ *      secuencia multi-tick), normalizacion a..z -> A..Z, entradas negativas invalidas,
+ *      consultas por nivel continuo, deteccion estricta de flancos de subida, teclas
+ *      no mapeadas, clearState() y dispose().
+ *   2. ScoreManager: estado inicial, bajas Tipo 1 (+100) y Tipo 2 (+250), progresion de
+ *      oleadas cada 5 bajas, entradas invalidas (tipos fuera de {1,2}, bonos <= 0),
+ *      persistencia de highScore tras reset(), saturacion exacta en 30000, proteccion
+ *      contra overflow de 16 bits (25000 + 32767 -> 30000) y dispose().
+ *
+ * Registro en RAM:
+ *   RAM[8000] = total de pruebas ejecutadas (40)
+ *   RAM[8001] = pruebas aprobadas (40)
+ *   RAM[8002] = pruebas fallidas (0)
+ *   RAM[8003] = ID de la primera prueba fallida (0 si todas aprueban)
+ *   RAM[8004..8011] = testigos numericos verificados por InputScoreTest.cmp
+ */
+class Main {
+
+    function int b2i(boolean flag) {
+        if (flag) {
+            return 1;
+        }
+        return 0;
+    }
+
+    function void check(int testId, int actual, int expected) {
+        var int total;
+        var int passed;
+        var int failed;
+        var int firstFail;
+
+        let total = (Memory.peek(8000) + 1);
+        do Memory.poke(8000, total);
+
+        if (actual = expected) {
+            let passed = (Memory.peek(8001) + 1);
+            do Memory.poke(8001, passed);
+        } else {
+            let failed = (Memory.peek(8002) + 1);
+            do Memory.poke(8002, failed);
+            let firstFail = Memory.peek(8003);
+            if (firstFail = 0) {
+                do Memory.poke(8003, testId);
+            }
+        }
+        return;
+    }
+
+    function void main() {
+        var int minInt16;
+        var InputManager input;
+        var ScoreManager scores;
+        var int r1;
+        var int r2;
+        var int r3;
+        var int wInputFirstPoll;
+        var int wPauseEdge;
+        var int wScoreCombo;
+        var int wWaves;
+        var int wHighPreserved;
+
+        do Memory.poke(8000, 0);
+        do Memory.poke(8001, 0);
+        do Memory.poke(8002, 0);
+        do Memory.poke(8003, 0);
+
+        let minInt16 = ((-32767) - 1);
+
+        // =====================================================================
+        // PARTE A: InputManager (Tests 1..24)
+        // Nota: InputScoreTest.tst pre-carga RAM[24576] = 97 ('a') al arrancar.
+        // =====================================================================
+        let input = InputManager.new();
+
+        // Estado inicial previo a poll()
+        do Main.check(1, input.getCurrentKey(), 0);
+        do Main.check(2, Main.b2i(((input.isMoveLeftHeld() | input.isFireHeld()) | (input.isStartTriggered() | input.isPauseTriggered()))), 0);
+
+        // Primer poll() lee RAM[24576] = 97 inyectado por .tst y normaliza a 'A' (65)
+        do input.poll();
+        let wInputFirstPoll = input.getCurrentKey();
+        do Main.check(3, wInputFirstPoll, 65);
+        do Main.check(4, ((Main.b2i(input.isMoveLeftHeld()) * 10) + Main.b2i(input.isMoveRightHeld())), 10);
+
+        // normalizeKey: bordes ASCII, especiales Hack y negativos defensivos
+        do Main.check(5, InputManager.normalizeKey(0), 0);
+        do Main.check(6, ((InputManager.normalizeKey(97) * 100) + InputManager.normalizeKey(122)), 6590);
+        do Main.check(7, ((InputManager.normalizeKey(96) * 100) + InputManager.normalizeKey(123)), 9723);
+        do Main.check(8, (InputManager.normalizeKey(130) + InputManager.normalizeKey(140)), 270);
+        do Main.check(9, (InputManager.normalizeKey(-1) + InputManager.normalizeKey(minInt16)), 0);
+
+        // Consultas por nivel continuo (movimiento y apuntado)
+        do Memory.poke(24576, GameConstants.keyLeft());
+        do input.poll();
+        do Main.check(10, Main.b2i(input.isMoveLeftHeld()), 1);
+
+        do Memory.poke(24576, GameConstants.keyD());
+        do input.poll();
+        let r1 = Main.b2i(input.isMoveRightHeld());
+        do Memory.poke(24576, 100);
+        do input.poll();
+        let r2 = Main.b2i(input.isMoveRightHeld());
+        do Memory.poke(24576, GameConstants.keyRight());
+        do input.poll();
+        let r3 = Main.b2i(input.isMoveRightHeld());
+        do Main.check(11, ((r1 * 100) + (r2 * 10) + r3), 111);
+
+        do Memory.poke(24576, GameConstants.keyW());
+        do input.poll();
+        let r1 = Main.b2i(input.isAimUpHeld());
+        do Memory.poke(24576, 119);
+        do input.poll();
+        let r2 = Main.b2i(input.isAimUpHeld());
+        do Memory.poke(24576, GameConstants.keyUp());
+        do input.poll();
+        let r3 = Main.b2i(input.isAimUpHeld());
+        do Main.check(12, ((r1 * 100) + (r2 * 10) + r3), 111);
+
+        do Memory.poke(24576, GameConstants.keyS());
+        do input.poll();
+        let r1 = Main.b2i(input.isAimDownHeld());
+        do Memory.poke(24576, 115);
+        do input.poll();
+        let r2 = Main.b2i(input.isAimDownHeld());
+        do Memory.poke(24576, GameConstants.keyDown());
+        do input.poll();
+        let r3 = Main.b2i(input.isAimDownHeld());
+        do Main.check(13, ((r1 * 100) + (r2 * 10) + r3), 111);
+
+        // Liberacion de teclas (RAM[24576] = 0)
+        do Memory.poke(24576, 0);
+        do input.poll();
+        do Main.check(14, (input.getCurrentKey() + Main.b2i(((input.isMoveLeftHeld() | input.isMoveRightHeld()) | (input.isAimUpHeld() | input.isAimDownHeld())))), 0);
+
+        // Espacio (32): flanco en isStartTriggered solo en tick 1, nivel continuo en isFireHeld
+        do Memory.poke(24576, GameConstants.keySpace());
+        do input.poll();
+        do Main.check(15, ((Main.b2i(input.isFireHeld()) * 10) + Main.b2i(input.isStartTriggered())), 11);
+
+        do input.poll();
+        do Main.check(16, ((Main.b2i(input.isFireHeld()) * 10) + Main.b2i(input.isStartTriggered())), 10);
+
+        // Enter (128): dispara isStartTriggered pero NO isFireHeld
+        do Memory.poke(24576, 0);
+        do input.poll();
+        do Memory.poke(24576, GameConstants.keyEnter());
+        do input.poll();
+        do Main.check(17, ((Main.b2i(input.isFireHeld()) * 10) + Main.b2i(input.isStartTriggered())), 1);
+
+        // Enter sostenido y cambio directo Enter -> Espacio sin soltar: no genera falso flanco
+        do input.poll();
+        let r1 = Main.b2i(input.isStartTriggered());
+        do Memory.poke(24576, GameConstants.keySpace());
+        do input.poll();
+        let r2 = Main.b2i(input.isStartTriggered());
+        do Main.check(18, ((r1 * 10) + r2), 0);
+
+        // Flanco de pausa con 'p' minuscula (112) seguido de 'P' mayuscula sostenida (80)
+        do Memory.poke(24576, 0);
+        do input.poll();
+        do Memory.poke(24576, 112);
+        do input.poll();
+        let r1 = Main.b2i(input.isPauseTriggered());
+        do Memory.poke(24576, GameConstants.keyP());
+        do input.poll();
+        let r2 = Main.b2i(input.isPauseTriggered());
+        let wPauseEdge = ((r1 * 10) + r2);
+        do Main.check(19, wPauseEdge, 10);
+
+        // Flanco de recarga y reinicio con 'r' (114) seguido de 'R' sostenida (82)
+        do Memory.poke(24576, 0);
+        do input.poll();
+        do Memory.poke(24576, 114);
+        do input.poll();
+        let r1 = ((Main.b2i(input.isReloadTriggered()) * 10) + Main.b2i(input.isRestartTriggered()));
+        do Memory.poke(24576, GameConstants.keyR());
+        do input.poll();
+        let r2 = ((Main.b2i(input.isReloadTriggered()) * 10) + Main.b2i(input.isRestartTriggered()));
+        do Main.check(20, ((r1 * 100) + r2), 1100);
+
+        // Flanco de salida a menu con ESC (140)
+        do Memory.poke(24576, 0);
+        do input.poll();
+        do Memory.poke(24576, GameConstants.keyEsc());
+        do input.poll();
+        let r1 = Main.b2i(input.isMenuExitTriggered());
+        do input.poll();
+        let r2 = Main.b2i(input.isMenuExitTriggered());
+        do Main.check(21, ((r1 * 10) + r2), 10);
+
+        // Tecla no mapeada ('X' = 88): ejecucion no bloqueante y predicados en falso
+        do Memory.poke(24576, 88);
+        do input.poll();
+        let r1 = Main.b2i((((input.isMoveLeftHeld() | input.isMoveRightHeld()) | (input.isAimUpHeld() | input.isAimDownHeld())) | input.isFireHeld()));
+        let r2 = Main.b2i((((input.isStartTriggered() | input.isPauseTriggered()) | (input.isReloadTriggered() | input.isRestartTriggered())) | input.isMenuExitTriggered()));
+        do Main.check(22, (r1 + r2), 0);
+
+        // clearState() limpia estado inmediatamente
+        do Memory.poke(24576, GameConstants.keyP());
+        do input.poll();
+        do input.clearState();
+        do Main.check(23, (input.getCurrentKey() + Main.b2i(input.isPauseTriggered())), 0);
+
+        // dispose() y re-creacion limpia
+        do Memory.poke(24576, 0);
+        do input.dispose();
+        let input = InputManager.new();
+        do input.poll();
+        do Main.check(24, input.getCurrentKey(), 0);
+        do input.dispose();
+
+        // =====================================================================
+        // PARTE B: ScoreManager (Tests 25..40)
+        // =====================================================================
+        let scores = ScoreManager.new();
+
+        // Estado inicial: score=0, highScore=0, kills=0, wave=1
+        do Main.check(25, ((scores.getScore() + scores.getHighScore()) + (scores.getKills() + scores.getWave())), 1);
+
+        // Baja Tipo 1 (+100)
+        do scores.registerKill(1);
+        do Main.check(26, scores.getScore(), 100);
+        do Main.check(27, scores.getHighScore(), 100);
+        do Main.check(28, ((scores.getKills() * 10) + scores.getWave()), 11);
+
+        // Baja Tipo 2 (+250 -> total 350, kills=2, wave=1)
+        do scores.registerKill(2);
+        let wScoreCombo = scores.getScore();
+        do Main.check(29, wScoreCombo, 350);
+
+        // Entradas invalidas a registerKill (fuera de {1, 2}) no alteran estado
+        do scores.registerKill(0);
+        do scores.registerKill(-1);
+        do scores.registerKill(3);
+        do scores.registerKill(99);
+        do Main.check(30, (scores.getScore() + scores.getKills()), 352);
+
+        // Progresion de oleadas: 4 bajas (wave=1) -> 5 bajas (wave=2)
+        do scores.registerKill(1);
+        do scores.registerKill(1);
+        let r1 = scores.getWave();
+        do scores.registerKill(1);
+        let r2 = scores.getWave();
+        do Main.check(31, ((r1 * 10) + r2), 12);
+
+        // Progresion de oleadas: 9 bajas (wave=2) -> 10 bajas (wave=3)
+        do scores.registerKill(2);
+        do scores.registerKill(2);
+        do scores.registerKill(2);
+        do scores.registerKill(2);
+        let r1 = scores.getWave();
+        do scores.registerKill(2);
+        let r2 = scores.getWave();
+        let wWaves = ((r1 * 10) + r2);
+        do Main.check(32, wWaves, 23);
+
+        // Entradas invalidas a addBonus (<= 0 y -32768) se ignoran
+        do scores.addBonus(0);
+        do scores.addBonus(-50);
+        do scores.addBonus(minInt16);
+        do Main.check(33, scores.getScore(), 1900);
+
+        // Bono valido (+100 -> 2000)
+        do scores.addBonus(100);
+        do Main.check(34, scores.getScore(), 2000);
+
+        // reset() reinicia partida pero preserva highScore = 2000
+        do scores.reset();
+        do Main.check(35, ((scores.getScore() + scores.getKills()) + scores.getWave()), 1);
+        do Main.check(36, scores.getHighScore(), 2000);
+
+        // Partida con menor puntaje (250 < 2000) no degrada highScore
+        do scores.registerKill(2);
+        do scores.reset();
+        let wHighPreserved = scores.getHighScore();
+        do Main.check(37, wHighPreserved, 2000);
+
+        // Borde exacto de saturacion en 30000
+        do scores.addBonus(29900);
+        do scores.registerKill(1);
+        do Main.check(38, scores.getScore(), 30000);
+
+        // Baja adicional sobre 30000 satura score pero sigue contabilizando kills
+        do scores.registerKill(2);
+        do Main.check(39, (scores.getScore() - scores.getKills()), 29998);
+
+        // Saturacion anti-overflow en 16 bits: 25000 + 32767 -> 30000 (nunca negativo)
+        do scores.reset();
+        do scores.addBonus(25000);
+        do scores.addBonus(32767);
+        do Main.check(40, scores.getScore(), 30000);
+
+        // Testigos numericos para comparacion .cmp en RAM[8004..8011]
+        do Memory.poke(8004, wInputFirstPoll);
+        do Memory.poke(8005, InputManager.normalizeKey(minInt16));
+        do Memory.poke(8006, wPauseEdge);
+        do Memory.poke(8007, wScoreCombo);
+        do Memory.poke(8008, wWaves);
+        do Memory.poke(8009, wHighPreserved);
+        do Memory.poke(8010, scores.getScore());
+        do Memory.poke(8011, scores.getHighScore());
+
+        do scores.dispose();
+        return;
+    }
+}
+

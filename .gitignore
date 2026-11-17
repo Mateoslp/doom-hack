@@ -1,0 +1,9 @@
+*.pyc
+.DS_Store
+.env
+.next/
+.venv/
+Thumbs.db
+__pycache__/
+node_modules/
+venv/

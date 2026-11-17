@@ -1,0 +1,359 @@
+function Enemy.new 0
+push constant 10
+call Memory.alloc 1
+pop pointer 0
+push constant 1
+pop this 1
+push pointer 0
+call Enemy.deactivate 1
+pop temp 0
+push pointer 0
+return
+function Enemy.spawn 1
+push argument 0
+pop pointer 0
+call GameConstants.corridorMaxX 0
+pop local 0
+push constant 0
+not
+pop this 0
+push argument 1
+push constant 2
+eq
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 2
+pop this 1
+push constant 4
+pop this 7
+push constant 1
+pop this 5
+push constant 18
+pop this 8
+goto IF_END0
+label IF_FALSE0
+push constant 1
+pop this 1
+push constant 2
+pop this 7
+push constant 2
+pop this 5
+push constant 10
+pop this 8
+label IF_END0
+push argument 2
+push local 0
+neg
+push local 0
+call MathUtils.clamp 3
+pop this 2
+push constant 12
+pop this 3
+push argument 3
+call GameConstants.zNearClip 0
+call GameConstants.zSpawn 0
+call MathUtils.clamp 3
+pop this 4
+push argument 4
+push constant 16
+neg
+push constant 16
+call MathUtils.clamp 3
+pop this 6
+push constant 0
+pop this 9
+push constant 0
+return
+function Enemy.deactivate 0
+push argument 0
+pop pointer 0
+push constant 0
+pop this 0
+push constant 0
+pop this 2
+push constant 12
+pop this 3
+call GameConstants.zSpawn 0
+pop this 4
+push constant 0
+pop this 5
+push constant 0
+pop this 6
+push constant 0
+pop this 7
+push constant 0
+pop this 8
+push constant 0
+pop this 9
+push constant 0
+return
+function Enemy.update 4
+push argument 0
+pop pointer 0
+push this 0
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+push this 9
+push constant 0
+gt
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push this 9
+push constant 1
+sub
+pop this 9
+label IF_FALSE1
+push this 8
+push constant 0
+gt
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push this 8
+push constant 1
+sub
+pop this 8
+label IF_FALSE2
+call GameConstants.corridorMaxX 0
+pop local 0
+push this 2
+push this 6
+add
+pop local 1
+push local 1
+push local 0
+neg
+lt
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push local 0
+neg
+pop this 2
+push this 6
+neg
+pop this 6
+goto IF_END3
+label IF_FALSE3
+push local 1
+push local 0
+gt
+if-goto IF_TRUE4
+goto IF_FALSE4
+label IF_TRUE4
+push local 0
+pop this 2
+push this 6
+neg
+pop this 6
+goto IF_END4
+label IF_FALSE4
+push local 1
+pop this 2
+label IF_END4
+label IF_END3
+call GameConstants.zMelee 0
+pop local 2
+push this 4
+push local 2
+gt
+if-goto IF_TRUE5
+goto IF_FALSE5
+label IF_TRUE5
+push this 4
+push this 5
+sub
+pop local 3
+push local 3
+push local 2
+lt
+if-goto IF_TRUE6
+goto IF_FALSE6
+label IF_TRUE6
+push local 2
+pop this 4
+goto IF_END6
+label IF_FALSE6
+push local 3
+pop this 4
+label IF_END6
+label IF_FALSE5
+push constant 0
+return
+function Enemy.takeDamage 0
+push argument 0
+pop pointer 0
+push this 0
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+push argument 1
+push constant 0
+gt
+not
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push constant 0
+return
+label IF_FALSE1
+push argument 1
+push this 7
+lt
+not
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push constant 0
+pop this 7
+push constant 0
+pop this 0
+push constant 0
+pop this 9
+push constant 0
+not
+return
+label IF_FALSE2
+push this 7
+push argument 1
+sub
+pop this 7
+push constant 2
+pop this 9
+push constant 0
+return
+function Enemy.isReadyToShoot 0
+push argument 0
+pop pointer 0
+push this 0
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+push this 4
+call GameConstants.zMelee 0
+gt
+not
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push constant 0
+return
+label IF_FALSE1
+push this 8
+push constant 0
+eq
+return
+function Enemy.resetAttackTimer 0
+push argument 0
+pop pointer 0
+push argument 1
+push constant 0
+push constant 1000
+call MathUtils.clamp 3
+pop this 8
+push constant 0
+return
+function Enemy.isActive 0
+push argument 0
+pop pointer 0
+push this 0
+return
+function Enemy.isHitFlashing 0
+push argument 0
+pop pointer 0
+push this 0
+push this 9
+push constant 0
+gt
+and
+return
+function Enemy.getType 0
+push argument 0
+pop pointer 0
+push this 1
+return
+function Enemy.getWorldX 0
+push argument 0
+pop pointer 0
+push this 2
+return
+function Enemy.getWorldY 0
+push argument 0
+pop pointer 0
+push this 3
+return
+function Enemy.getZ 0
+push argument 0
+pop pointer 0
+push this 4
+return
+function Enemy.getHp 0
+push argument 0
+pop pointer 0
+push this 7
+return
+function Enemy.getBaseWidth 0
+push argument 0
+pop pointer 0
+push this 1
+push constant 2
+eq
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 28
+return
+label IF_FALSE0
+push constant 22
+return
+function Enemy.getBaseHeight 0
+push argument 0
+pop pointer 0
+push this 1
+push constant 2
+eq
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 36
+return
+label IF_FALSE0
+push constant 32
+return
+function Enemy.getMeleeDamage 0
+push argument 0
+pop pointer 0
+push this 1
+push constant 2
+eq
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 25
+return
+label IF_FALSE0
+push constant 15
+return
+function Enemy.dispose 0
+push argument 0
+pop pointer 0
+push pointer 0
+call Memory.deAlloc 1
+pop temp 0
+push constant 0
+return

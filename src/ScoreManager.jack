@@ -1,0 +1,121 @@
+/**
+ * ScoreManager.jack
+ * Subsistema de puntuacion, record de sesion, conteo de bajas y progresion
+ * de oleadas (Capa 1).
+ *
+ * Reglas de dominio (GDD Secciones E.3, G, I, J y Arquitectura Seccion C):
+ *   - Enemigo Tipo 1 (Acechador): +100 puntos.
+ *   - Enemigo Tipo 2 (Bruto Igneo): +250 puntos.
+ *   - Saturacion estricta en 30000 puntos sin riesgo de overflow en 16 bits.
+ *   - Oleada inicial wave = 1; incrementa en +1 cada 5 bajas confirmadas.
+ *   - reset() reinicia score, kills y wave conservando highScore en la sesion.
+ */
+class ScoreManager {
+
+    field int score;
+    field int highScore;
+    field int kills;
+    field int wave;
+
+    /** Crea el gestor con marcador inicial en cero y oleada 1. */
+    constructor ScoreManager new() {
+        let score = 0;
+        let highScore = 0;
+        let kills = 0;
+        let wave = 1;
+        return this;
+    }
+
+    /**
+     * Reinicia las metricas de la partida actual conservando el record de sesion (highScore).
+     * Cero asignaciones de memoria.
+     */
+    method void reset() {
+        if (score > highScore) {
+            let highScore = score;
+        }
+        let score = 0;
+        let kills = 0;
+        let wave = 1;
+        return;
+    }
+
+    /**
+     * Registra la eliminacion de un enemigo valido (Tipo 1 -> +100, Tipo 2 -> +250),
+     * incrementa el contador de bajas (saturado en 30000) y recalcula la oleada activa.
+     * Entradas fuera de {1, 2} se ignoran defensivamente sin alterar el estado.
+     */
+    method void registerKill(int enemyType) {
+        var int points;
+
+        if (enemyType = 1) {
+            let points = 100;
+        } else {
+            if (enemyType = 2) {
+                let points = 250;
+            } else {
+                return;
+            }
+        }
+
+        do addBonus(points);
+
+        if (kills < 30000) {
+            let kills = (kills + 1);
+        }
+        let wave = (1 + (kills / 5));
+        return;
+    }
+
+    /**
+     * Suma una bonificacion positiva al puntaje actual saturando en 30000.
+     * Evalua (30000 - score) antes de sumar para impedir desbordamiento de 16 bits
+     * incluso si points es cercano a 32767. Valores <= 0 se ignoran defensivamente.
+     */
+    method void addBonus(int points) {
+        var int remaining;
+
+        if (~(points > 0)) {
+            return;
+        }
+
+        let remaining = (30000 - score);
+        if (points > remaining) {
+            let score = 30000;
+        } else {
+            let score = (score + points);
+        }
+
+        if (score > highScore) {
+            let highScore = score;
+        }
+        return;
+    }
+
+    /** Retorna la puntuacion actual en [0, 30000]. */
+    method int getScore() {
+        return score;
+    }
+
+    /** Retorna el record maximo alcanzado durante la sesion en [0, 30000]. */
+    method int getHighScore() {
+        return highScore;
+    }
+
+    /** Retorna el total de enemigos abatidos en la partida actual. */
+    method int getKills() {
+        return kills;
+    }
+
+    /** Retorna el numero de oleada actual (>= 1, +1 cada 5 bajas). */
+    method int getWave() {
+        return wave;
+    }
+
+    /** Libera las 4 palabras de memoria de esta instancia. */
+    method void dispose() {
+        do Memory.deAlloc(this);
+        return;
+    }
+}
+

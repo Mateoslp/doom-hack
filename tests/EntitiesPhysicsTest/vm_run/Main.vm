@@ -1,0 +1,1953 @@
+function Main.b2i 0
+push argument 0
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 1
+return
+label IF_FALSE0
+push constant 0
+return
+function Main.nonZero 0
+push argument 0
+push constant 0
+eq
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 1
+return
+label IF_FALSE0
+push constant 0
+return
+function Main.check 4
+push constant 8000
+call Memory.peek 1
+push constant 1
+add
+pop local 0
+push constant 8000
+push local 0
+call Memory.poke 2
+pop temp 0
+push argument 1
+push argument 2
+eq
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 8001
+call Memory.peek 1
+push constant 1
+add
+pop local 1
+push constant 8001
+push local 1
+call Memory.poke 2
+pop temp 0
+goto IF_END0
+label IF_FALSE0
+push constant 8002
+call Memory.peek 1
+push constant 1
+add
+pop local 2
+push constant 8002
+push local 2
+call Memory.poke 2
+pop temp 0
+push constant 8003
+call Memory.peek 1
+pop local 3
+push local 3
+push constant 0
+eq
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push constant 8003
+push argument 0
+call Memory.poke 2
+pop temp 0
+label IF_FALSE1
+label IF_END0
+push constant 0
+return
+function Main.main 38
+push constant 8000
+push constant 0
+call Memory.poke 2
+pop temp 0
+push constant 8001
+push constant 0
+call Memory.poke 2
+pop temp 0
+push constant 8002
+push constant 0
+call Memory.poke 2
+pop temp 0
+push constant 8003
+push constant 0
+call Memory.poke 2
+pop temp 0
+push constant 32767
+neg
+push constant 1
+sub
+pop local 0
+call Enemy.new 0
+pop local 1
+push constant 1
+push local 1
+call Enemy.isActive 1
+call Main.b2i 1
+push constant 1000
+call Math.multiply 2
+push local 1
+call Enemy.isHitFlashing 1
+call Main.b2i 1
+push constant 100
+call Math.multiply 2
+add
+push local 1
+call Enemy.isReadyToShoot 1
+call Main.b2i 1
+push constant 10
+call Math.multiply 2
+push local 1
+call Enemy.getHp 1
+add
+add
+push constant 0
+call Main.check 3
+pop temp 0
+push local 1
+push constant 1
+push constant 40
+neg
+push constant 100
+push constant 12
+call Enemy.spawn 5
+pop temp 0
+push constant 2
+push local 1
+call Enemy.isActive 1
+call Main.b2i 1
+push constant 100
+call Math.multiply 2
+push local 1
+call Enemy.getType 1
+push constant 10
+call Math.multiply 2
+add
+push local 1
+call Enemy.getHp 1
+add
+push constant 112
+call Main.check 3
+pop temp 0
+push constant 3
+push local 1
+call Enemy.getZ 1
+push local 1
+call Enemy.getWorldX 1
+add
+push local 1
+call Enemy.getWorldY 1
+add
+push constant 100
+call Math.multiply 2
+push local 1
+call Enemy.getBaseWidth 1
+add
+push local 1
+call Enemy.getBaseHeight 1
+push local 1
+call Enemy.getMeleeDamage 1
+add
+add
+push constant 7269
+call Main.check 3
+pop temp 0
+push local 1
+call Enemy.update 1
+pop temp 0
+push constant 4
+push local 1
+call Enemy.getZ 1
+push constant 100
+call Math.multiply 2
+push local 1
+call Enemy.getWorldX 1
+neg
+add
+push local 1
+call Enemy.isReadyToShoot 1
+call Main.b2i 1
+add
+push constant 9828
+call Main.check 3
+pop temp 0
+push constant 0
+pop local 12
+label WHILE_EXP0
+push local 12
+push constant 9
+lt
+not
+if-goto WHILE_END0
+push local 1
+call Enemy.update 1
+pop temp 0
+push local 12
+push constant 1
+add
+pop local 12
+goto WHILE_EXP0
+label WHILE_END0
+push constant 5
+push local 1
+call Enemy.getZ 1
+push constant 100
+call Math.multiply 2
+push local 1
+call Enemy.getWorldX 1
+add
+push local 1
+call Enemy.isReadyToShoot 1
+call Main.b2i 1
+add
+push constant 8081
+call Main.check 3
+pop temp 0
+push local 1
+push constant 5
+call Enemy.resetAttackTimer 2
+pop temp 0
+push constant 0
+pop local 12
+label WHILE_EXP1
+push local 12
+push constant 8
+lt
+not
+if-goto WHILE_END1
+push local 1
+call Enemy.update 1
+pop temp 0
+push local 12
+push constant 1
+add
+pop local 12
+goto WHILE_EXP1
+label WHILE_END1
+push constant 6
+push local 1
+call Enemy.getWorldX 1
+push constant 100
+call Math.multiply 2
+push local 1
+call Enemy.getZ 1
+add
+push local 1
+call Enemy.isReadyToShoot 1
+call Main.b2i 1
+add
+push constant 14865
+call Main.check 3
+pop temp 0
+push local 1
+push constant 99
+push constant 500
+neg
+push constant 999
+push constant 50
+neg
+call Enemy.spawn 5
+pop temp 0
+push local 1
+call Enemy.update 1
+pop temp 0
+push local 1
+call Enemy.update 1
+pop temp 0
+push constant 7
+push local 1
+call Enemy.getType 1
+push constant 1000
+call Math.multiply 2
+push local 1
+call Enemy.getWorldX 1
+neg
+add
+push local 1
+call Enemy.getZ 1
+add
+push constant 1240
+call Main.check 3
+pop temp 0
+push constant 0
+pop local 12
+label WHILE_EXP2
+push local 12
+push constant 60
+lt
+not
+if-goto WHILE_END2
+push local 1
+call Enemy.update 1
+pop temp 0
+push local 12
+push constant 1
+add
+pop local 12
+goto WHILE_EXP2
+label WHILE_END2
+push constant 8
+push local 1
+call Enemy.getZ 1
+push constant 100
+call Math.multiply 2
+push local 1
+call Enemy.isActive 1
+call Main.b2i 1
+push constant 10
+call Math.multiply 2
+add
+push local 1
+call Enemy.isReadyToShoot 1
+call Main.b2i 1
+add
+push constant 1410
+call Main.check 3
+pop temp 0
+push local 1
+push constant 2
+push constant 30
+push constant 90
+push constant 0
+call Enemy.spawn 5
+pop temp 0
+push local 1
+call Enemy.update 1
+pop temp 0
+push constant 9
+push local 1
+call Enemy.getType 1
+push constant 1000
+call Math.multiply 2
+push local 1
+call Enemy.getHp 1
+push constant 100
+call Math.multiply 2
+add
+push local 1
+call Enemy.getZ 1
+add
+push constant 2489
+call Main.check 3
+pop temp 0
+push constant 10
+push local 1
+call Enemy.getBaseWidth 1
+push local 1
+call Enemy.getBaseHeight 1
+add
+push local 1
+call Enemy.getMeleeDamage 1
+add
+push constant 100
+call Math.multiply 2
+push local 1
+call Enemy.getBaseWidth 1
+push constant 100
+call MathUtils.projectSize 2
+add
+push constant 8917
+call Main.check 3
+pop temp 0
+push constant 11
+push local 1
+push constant 0
+call Enemy.takeDamage 2
+call Main.b2i 1
+push local 1
+push constant 5
+neg
+call Enemy.takeDamage 2
+call Main.b2i 1
+add
+push local 1
+push local 0
+call Enemy.takeDamage 2
+call Main.b2i 1
+add
+push local 1
+call Enemy.isHitFlashing 1
+call Main.b2i 1
+add
+push local 1
+call Enemy.getHp 1
+add
+push constant 4
+call Main.check 3
+pop temp 0
+push local 1
+push constant 1
+call Enemy.takeDamage 2
+pop local 15
+push local 1
+call Enemy.isHitFlashing 1
+pop local 16
+push local 1
+call Enemy.update 1
+pop temp 0
+push local 1
+call Enemy.isHitFlashing 1
+pop local 17
+push local 1
+call Enemy.update 1
+pop temp 0
+push local 1
+call Enemy.isHitFlashing 1
+pop local 18
+push constant 12
+push local 15
+call Main.b2i 1
+push constant 1000
+call Math.multiply 2
+push local 1
+call Enemy.getHp 1
+push constant 100
+call Math.multiply 2
+add
+push local 16
+call Main.b2i 1
+push constant 10
+call Math.multiply 2
+add
+push local 17
+call Main.b2i 1
+push constant 2
+call Math.multiply 2
+push local 18
+call Main.b2i 1
+add
+add
+push constant 312
+call Main.check 3
+pop temp 0
+call ScoreManager.new 0
+pop local 7
+push local 1
+push constant 3
+call Enemy.takeDamage 2
+pop local 15
+push local 15
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push local 7
+push local 1
+call Enemy.getType 1
+call ScoreManager.registerKill 2
+pop temp 0
+label IF_FALSE0
+push constant 13
+push local 15
+call Main.b2i 1
+push constant 1000
+call Math.multiply 2
+push local 1
+call Enemy.isActive 1
+call Main.b2i 1
+push constant 100
+call Math.multiply 2
+add
+push local 1
+call Enemy.getType 1
+push constant 10
+call Math.multiply 2
+add
+push local 1
+push constant 1
+call Enemy.takeDamage 2
+call Main.b2i 1
+add
+push constant 1020
+call Main.check 3
+pop temp 0
+push constant 14
+push local 7
+call ScoreManager.getScore 1
+push constant 250
+call Main.check 3
+pop temp 0
+push local 7
+call ScoreManager.dispose 1
+pop temp 0
+push local 1
+call Enemy.dispose 1
+pop temp 0
+call Projectile.new 0
+pop local 4
+push constant 15
+push local 4
+call Projectile.isActive 1
+call Main.b2i 1
+push constant 100
+call Math.multiply 2
+push local 4
+call Projectile.getFpX 1
+add
+push local 4
+call Projectile.getFpY 1
+push local 4
+call Projectile.getBounceCount 1
+add
+add
+push constant 0
+call Main.check 3
+pop temp 0
+push local 4
+push constant 25
+neg
+push constant 12
+push constant 80
+push constant 32
+push constant 136
+neg
+push constant 2
+push constant 10
+call Projectile.spawn 8
+pop temp 0
+push constant 16
+push local 4
+call Projectile.getFpX 1
+push constant 1000
+add
+push constant 10
+call Math.multiply 2
+push local 4
+call Projectile.isActive 1
+call Main.b2i 1
+add
+push local 4
+call Projectile.getFpY 1
+push constant 192
+sub
+add
+push constant 6001
+call Main.check 3
+pop temp 0
+push constant 17
+push local 4
+call Projectile.getZ 1
+push local 4
+call Projectile.getVx 1
+add
+push local 4
+call Projectile.getDamage 1
+add
+push local 4
+call Projectile.getVy 1
+neg
+add
+push local 4
+call Projectile.getWorldY 1
+push local 4
+call Projectile.getWorldX 1
+sub
+add
+push constant 295
+call Main.check 3
+pop temp 0
+push local 4
+push constant 999
+push constant 999
+neg
+push constant 500
+push constant 999
+neg
+push constant 999
+push constant 0
+push constant 10
+neg
+call Projectile.spawn 8
+pop temp 0
+push constant 18
+push local 4
+call Projectile.getWorldX 1
+push local 4
+call Projectile.getWorldY 1
+sub
+push constant 10
+call Math.multiply 2
+push local 4
+call Projectile.getZ 1
+push local 4
+call Projectile.getVy 1
+add
+push local 4
+call Projectile.getVz 1
+add
+push local 4
+call Projectile.getDamage 1
+add
+add
+push constant 2842
+call Main.check 3
+pop temp 0
+push local 4
+push constant 320
+push constant 480
+neg
+push constant 45
+push constant 24
+neg
+push constant 60
+call Projectile.setKinematics 6
+pop temp 0
+push local 4
+call Projectile.registerBounce 1
+pop temp 0
+push local 4
+call Projectile.registerBounce 1
+pop temp 0
+push constant 19
+push local 4
+call Projectile.getWorldX 1
+push local 4
+call Projectile.getWorldY 1
+sub
+push local 4
+call Projectile.getZ 1
+add
+push constant 10
+call Math.multiply 2
+push local 4
+call Projectile.getBounceCount 1
+add
+push local 4
+call Projectile.getVz 1
+push constant 1
+sub
+add
+push constant 952
+call Main.check 3
+pop temp 0
+push local 4
+call Projectile.deactivate 1
+pop temp 0
+push constant 20
+push local 4
+call Projectile.isActive 1
+call Main.b2i 1
+push constant 100
+call Math.multiply 2
+push local 4
+call Projectile.getBounceCount 1
+add
+push local 4
+call Projectile.getDamage 1
+add
+push constant 0
+call Main.check 3
+pop temp 0
+push local 4
+push constant 0
+push constant 0
+push constant 80
+push constant 20
+push constant 136
+neg
+push constant 2
+push constant 10
+call Projectile.spawn 8
+pop temp 0
+push local 4
+call PhysicsEngine.updateProjectile 1
+pop temp 0
+push constant 21
+push local 4
+call Projectile.getVy 1
+neg
+push constant 100
+call Math.multiply 2
+push local 4
+call Projectile.getZ 1
+add
+push local 4
+call Projectile.getFpX 1
+push local 4
+call Projectile.getFpY 1
+sub
+push constant 144
+sub
+add
+push constant 12478
+call Main.check 3
+pop temp 0
+push constant 0
+pop local 12
+label WHILE_EXP3
+push local 12
+push constant 11
+lt
+not
+if-goto WHILE_END3
+push local 4
+call PhysicsEngine.updateProjectile 1
+pop temp 0
+push local 12
+push constant 1
+add
+pop local 12
+goto WHILE_EXP3
+label WHILE_END3
+push constant 22
+push local 4
+call Projectile.getFpY 1
+neg
+push constant 10
+call Math.multiply 2
+push local 4
+call Projectile.getVy 1
+add
+push local 4
+call Projectile.getFpX 1
+push local 4
+call Projectile.getZ 1
+add
+push constant 296
+sub
+add
+push constant 6968
+call Main.check 3
+pop temp 0
+push local 4
+push constant 0
+push constant 80
+neg
+push constant 90
+push constant 0
+push constant 234
+push constant 1
+push constant 10
+call Projectile.spawn 8
+pop temp 0
+push local 4
+call PhysicsEngine.updateProjectile 1
+pop temp 0
+push local 4
+call PhysicsEngine.updateProjectile 1
+pop temp 0
+push constant 23
+push local 4
+call Projectile.getVy 1
+push constant 10
+call Math.multiply 2
+push local 4
+call Projectile.getFpY 1
+neg
+push constant 100
+call Math.divide 2
+add
+push constant 2408
+call Main.check 3
+pop temp 0
+push local 4
+push constant 0
+push constant 85
+push constant 60
+push constant 16
+push constant 148
+push constant 2
+push constant 10
+call Projectile.spawn 8
+pop temp 0
+push local 4
+call PhysicsEngine.updateProjectile 1
+pop temp 0
+push local 4
+call Projectile.getVy 1
+pop local 21
+push constant 24
+push local 4
+call Projectile.getFpY 1
+push constant 10
+call Math.multiply 2
+push local 4
+call Projectile.getBounceCount 1
+add
+push constant 14401
+call Main.check 3
+pop temp 0
+push local 4
+call PhysicsEngine.updateProjectile 1
+pop temp 0
+push constant 25
+push local 21
+neg
+push constant 100
+call Math.multiply 2
+push constant 1440
+push local 4
+call Projectile.getFpY 1
+sub
+add
+push constant 14128
+call Main.check 3
+pop temp 0
+push local 4
+push constant 0
+push constant 88
+push constant 50
+push constant 0
+push constant 88
+push constant 2
+push constant 10
+call Projectile.spawn 8
+pop temp 0
+push local 4
+call PhysicsEngine.updateProjectile 1
+pop temp 0
+push constant 26
+push local 4
+call Projectile.getFpY 1
+push local 4
+call Projectile.getVy 1
+neg
+add
+push local 4
+call Projectile.getBounceCount 1
+add
+push constant 1528
+call Main.check 3
+pop temp 0
+push local 4
+push constant 0
+push constant 85
+neg
+push constant 50
+push constant 0
+push constant 180
+neg
+push constant 2
+push constant 10
+call Projectile.spawn 8
+pop temp 0
+push local 4
+call PhysicsEngine.updateProjectile 1
+pop temp 0
+push constant 27
+push local 4
+call Projectile.getFpY 1
+neg
+push local 4
+call Projectile.getVy 1
+add
+push local 4
+call Projectile.getBounceCount 1
+add
+push constant 1609
+call Main.check 3
+pop temp 0
+push local 4
+push constant 155
+neg
+push constant 0
+push constant 50
+push constant 120
+neg
+push constant 12
+neg
+push constant 2
+push constant 10
+call Projectile.spawn 8
+pop temp 0
+push local 4
+call PhysicsEngine.updateProjectile 1
+pop temp 0
+push constant 28
+push local 4
+call Projectile.getFpX 1
+neg
+push local 4
+call Projectile.getVx 1
+add
+push local 4
+call Projectile.getBounceCount 1
+add
+push constant 2681
+call Main.check 3
+pop temp 0
+push local 4
+push constant 155
+push constant 88
+push constant 50
+push constant 120
+push constant 88
+push constant 2
+push constant 10
+call Projectile.spawn 8
+pop temp 0
+push local 4
+call PhysicsEngine.updateProjectile 1
+pop temp 0
+push constant 29
+push local 4
+call Projectile.getFpX 1
+push local 4
+call Projectile.getFpY 1
+add
+push local 4
+call Projectile.getVx 1
+neg
+add
+push local 4
+call Projectile.getVy 1
+neg
+add
+push local 4
+call Projectile.getBounceCount 1
+add
+push constant 4209
+call Main.check 3
+pop temp 0
+push local 4
+push constant 0
+push constant 0
+push constant 11
+push constant 0
+push constant 0
+push constant 2
+push constant 10
+call Projectile.spawn 8
+pop temp 0
+push local 4
+call PhysicsEngine.updateProjectile 1
+pop temp 0
+push local 4
+call Projectile.getZ 1
+pop local 20
+push local 4
+call Projectile.isActive 1
+pop local 19
+push local 4
+call PhysicsEngine.updateProjectile 1
+pop temp 0
+push constant 30
+push local 20
+push constant 100
+call Math.multiply 2
+push local 19
+call Main.b2i 1
+push constant 10
+call Math.multiply 2
+add
+push local 4
+call Projectile.isActive 1
+call Main.b2i 1
+add
+push constant 910
+call Main.check 3
+pop temp 0
+push constant 0
+call PhysicsEngine.updateProjectile 1
+pop temp 0
+push local 4
+call PhysicsEngine.updateProjectile 1
+pop temp 0
+push constant 0
+push constant 5
+call PhysicsEngine.updatePool 2
+pop temp 0
+push constant 31
+push local 4
+call Projectile.isActive 1
+call Main.b2i 1
+push constant 1000
+call Math.multiply 2
+push local 4
+call Projectile.getZ 1
+add
+push constant 100
+call Main.check 3
+pop temp 0
+push local 4
+push constant 60
+neg
+push constant 12
+push constant 100
+push constant 110
+push constant 136
+neg
+push constant 2
+push constant 15
+call Projectile.spawn 8
+pop temp 0
+push constant 0
+pop local 25
+push constant 0
+pop local 12
+label WHILE_EXP4
+push local 12
+push constant 45
+lt
+not
+if-goto WHILE_END4
+push local 4
+call PhysicsEngine.updateProjectile 1
+pop temp 0
+push local 4
+call Projectile.getFpX 1
+push constant 2560
+neg
+lt
+push local 4
+call Projectile.getFpX 1
+push constant 2560
+gt
+or
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push local 25
+push constant 1
+add
+pop local 25
+label IF_FALSE1
+push local 4
+call Projectile.getFpY 1
+push constant 1440
+neg
+lt
+push local 4
+call Projectile.getFpY 1
+push constant 1440
+gt
+or
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push local 25
+push constant 1
+add
+pop local 25
+label IF_FALSE2
+push local 4
+call Projectile.getVy 1
+push constant 240
+neg
+lt
+push local 4
+call Projectile.getVy 1
+push constant 240
+gt
+or
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push local 25
+push constant 1
+add
+pop local 25
+label IF_FALSE3
+push local 4
+call Projectile.getZ 1
+push constant 8
+lt
+if-goto IF_TRUE4
+goto IF_FALSE4
+label IF_TRUE4
+push local 25
+push constant 1
+add
+pop local 25
+label IF_FALSE4
+push local 12
+push constant 1
+add
+pop local 12
+goto WHILE_EXP4
+label WHILE_END4
+push local 4
+call Projectile.getFpX 1
+pop local 22
+push local 4
+call Projectile.getFpY 1
+pop local 23
+push local 4
+call Projectile.getBounceCount 1
+pop local 24
+push constant 32
+push local 22
+push local 23
+add
+push local 4
+call Projectile.getVx 1
+neg
+add
+push local 4
+call Projectile.getVy 1
+add
+push local 4
+call Projectile.getZ 1
+add
+push local 24
+add
+push local 25
+push constant 1000
+call Math.multiply 2
+add
+push constant 1481
+call Main.check 3
+pop temp 0
+push local 4
+call Projectile.dispose 1
+pop temp 0
+call EntityManager.new 0
+pop local 8
+push constant 2049
+call Memory.peek 1
+pop local 36
+push local 8
+call EntityManager.getEnemies 1
+pop local 10
+push local 8
+call EntityManager.getProjectiles 1
+pop local 11
+push local 11
+push constant 0
+call PhysicsEngine.updatePool 2
+pop temp 0
+push local 11
+push constant 3
+neg
+call PhysicsEngine.updatePool 2
+pop temp 0
+push constant 1
+pop local 32
+push constant 0
+pop local 12
+label WHILE_EXP5
+push local 12
+push constant 4
+lt
+not
+if-goto WHILE_END5
+push local 12
+push local 10
+add
+pop pointer 1
+push that 0
+pop local 2
+push local 2
+push constant 0
+eq
+push local 2
+call Enemy.isActive 1
+or
+if-goto IF_TRUE5
+goto IF_FALSE5
+label IF_TRUE5
+push constant 0
+pop local 32
+label IF_FALSE5
+push local 12
+push constant 1
+add
+pop local 12
+goto WHILE_EXP5
+label WHILE_END5
+push constant 0
+pop local 12
+label WHILE_EXP6
+push local 12
+push constant 5
+lt
+not
+if-goto WHILE_END6
+push local 12
+push local 11
+add
+pop pointer 1
+push that 0
+pop local 5
+push local 5
+push constant 0
+eq
+push local 5
+call Projectile.isActive 1
+or
+if-goto IF_TRUE6
+goto IF_FALSE6
+label IF_TRUE6
+push constant 0
+pop local 32
+label IF_FALSE6
+push local 12
+push constant 1
+add
+pop local 12
+goto WHILE_EXP6
+label WHILE_END6
+push constant 33
+push local 32
+push constant 100
+call Math.multiply 2
+push local 8
+call EntityManager.getActiveEnemyCount 1
+add
+push constant 100
+call Main.check 3
+pop temp 0
+push constant 0
+pop local 14
+push local 8
+push constant 1
+push constant 80
+neg
+push constant 100
+push constant 2
+call EntityManager.spawnEnemy 5
+if-goto IF_TRUE7
+goto IF_FALSE7
+label IF_TRUE7
+push local 14
+push constant 1
+add
+pop local 14
+label IF_FALSE7
+push local 8
+push constant 2
+push constant 20
+neg
+push constant 95
+push constant 2
+neg
+call EntityManager.spawnEnemy 5
+if-goto IF_TRUE8
+goto IF_FALSE8
+label IF_TRUE8
+push local 14
+push constant 1
+add
+pop local 14
+label IF_FALSE8
+push local 8
+push constant 1
+push constant 40
+push constant 90
+push constant 4
+call EntityManager.spawnEnemy 5
+if-goto IF_TRUE9
+goto IF_FALSE9
+label IF_TRUE9
+push local 14
+push constant 1
+add
+pop local 14
+label IF_FALSE9
+push local 8
+push constant 2
+push constant 100
+push constant 85
+push constant 4
+neg
+call EntityManager.spawnEnemy 5
+if-goto IF_TRUE10
+goto IF_FALSE10
+label IF_TRUE10
+push local 14
+push constant 1
+add
+pop local 14
+label IF_FALSE10
+push local 8
+push constant 1
+push constant 0
+push constant 100
+push constant 0
+call EntityManager.spawnEnemy 5
+if-goto IF_TRUE11
+goto IF_FALSE11
+label IF_TRUE11
+push local 14
+push constant 100
+add
+pop local 14
+label IF_FALSE11
+push constant 0
+push local 10
+add
+pop pointer 1
+push that 0
+pop local 2
+push constant 34
+push local 14
+push constant 100
+call Math.multiply 2
+push local 8
+call EntityManager.getActiveEnemyCount 1
+push constant 10
+call Math.multiply 2
+add
+push local 2
+call Enemy.getWorldX 1
+neg
+push constant 10
+call Math.divide 2
+add
+push constant 448
+call Main.check 3
+pop temp 0
+push constant 1
+push local 10
+add
+pop pointer 1
+push that 0
+pop local 2
+push local 2
+call Enemy.deactivate 1
+pop temp 0
+push local 8
+push constant 2
+push constant 77
+push constant 88
+push constant 3
+call EntityManager.spawnEnemy 5
+call Main.b2i 1
+pop local 14
+push constant 1
+push local 10
+add
+pop pointer 1
+push that 0
+pop local 3
+push constant 35
+push local 14
+push constant 1000
+call Math.multiply 2
+push local 2
+push local 3
+eq
+call Main.b2i 1
+push constant 100
+call Math.multiply 2
+add
+push local 3
+call Enemy.getWorldX 1
+add
+push local 8
+call EntityManager.getActiveEnemyCount 1
+add
+push constant 1181
+call Main.check 3
+pop temp 0
+push constant 0
+pop local 14
+push constant 0
+pop local 12
+label WHILE_EXP7
+push local 12
+push constant 5
+lt
+not
+if-goto WHILE_END7
+push local 8
+push local 12
+push constant 10
+call Math.multiply 2
+push constant 0
+push constant 80
+push constant 0
+push constant 100
+neg
+push constant 2
+push constant 10
+call EntityManager.spawnProjectile 8
+if-goto IF_TRUE12
+goto IF_FALSE12
+label IF_TRUE12
+push local 14
+push constant 1
+add
+pop local 14
+label IF_FALSE12
+push local 12
+push constant 1
+add
+pop local 12
+goto WHILE_EXP7
+label WHILE_END7
+push local 8
+push constant 99
+push constant 0
+push constant 80
+push constant 0
+push constant 100
+neg
+push constant 2
+push constant 10
+call EntityManager.spawnProjectile 8
+if-goto IF_TRUE13
+goto IF_FALSE13
+label IF_TRUE13
+push local 14
+push constant 100
+add
+pop local 14
+label IF_FALSE13
+push constant 2
+push local 11
+add
+pop pointer 1
+push that 0
+pop local 5
+push local 5
+call Projectile.deactivate 1
+pop temp 0
+push local 8
+push constant 55
+push constant 20
+neg
+push constant 70
+push constant 16
+push constant 120
+neg
+push constant 2
+push constant 15
+call EntityManager.spawnProjectile 8
+if-goto IF_TRUE14
+goto IF_FALSE14
+label IF_TRUE14
+push local 14
+push constant 10
+add
+pop local 14
+label IF_FALSE14
+push constant 2
+push local 11
+add
+pop pointer 1
+push that 0
+pop local 6
+push constant 36
+push local 14
+push constant 100
+call Math.multiply 2
+push local 5
+push local 6
+eq
+call Main.b2i 1
+push constant 10
+call Math.multiply 2
+add
+push local 6
+call Projectile.getWorldX 1
+push constant 50
+sub
+add
+push constant 1515
+call Main.check 3
+pop temp 0
+push local 8
+call EntityManager.reset 1
+pop temp 0
+push local 8
+push constant 0
+push constant 0
+push constant 60
+push constant 0
+push constant 100
+neg
+push constant 2
+push constant 10
+call EntityManager.spawnProjectile 8
+pop temp 0
+push local 8
+push constant 0
+push constant 0
+push constant 9
+push constant 0
+push constant 0
+push constant 2
+push constant 10
+call EntityManager.spawnProjectile 8
+pop temp 0
+push local 8
+call EntityManager.updateProjectilesPhysics 1
+pop temp 0
+push constant 0
+push local 11
+add
+pop pointer 1
+push that 0
+pop local 5
+push constant 1
+push local 11
+add
+pop pointer 1
+push that 0
+pop local 6
+push constant 37
+push local 5
+call Projectile.isActive 1
+call Main.b2i 1
+push constant 1000
+call Math.multiply 2
+push local 6
+call Projectile.isActive 1
+call Main.b2i 1
+push constant 100
+call Math.multiply 2
+add
+push local 5
+call Projectile.getZ 1
+add
+push local 5
+call Projectile.getVy 1
+neg
+add
+push constant 1146
+call Main.check 3
+pop temp 0
+push constant 0
+pop local 12
+label WHILE_EXP8
+push local 12
+push constant 10
+lt
+not
+if-goto WHILE_END8
+push local 8
+call EntityManager.tickSeed 1
+pop temp 0
+push local 12
+push constant 1
+add
+pop local 12
+goto WHILE_EXP8
+label WHILE_END8
+push local 8
+push constant 0
+call EntityManager.nextRandomBounded 2
+push local 8
+push constant 10
+neg
+call EntityManager.nextRandomBounded 2
+add
+push local 8
+push constant 1
+call EntityManager.nextRandomBounded 2
+add
+pop local 26
+push constant 0
+pop local 27
+push constant 0
+pop local 28
+push constant 0
+pop local 12
+label WHILE_EXP9
+push local 12
+push constant 300
+lt
+not
+if-goto WHILE_END9
+push local 8
+push constant 17
+call EntityManager.nextRandomBounded 2
+pop local 13
+push local 13
+push constant 0
+lt
+push local 13
+push constant 16
+gt
+or
+if-goto IF_TRUE15
+goto IF_FALSE15
+label IF_TRUE15
+push local 26
+push constant 1
+add
+pop local 26
+label IF_FALSE15
+push local 13
+push constant 0
+eq
+if-goto IF_TRUE16
+goto IF_FALSE16
+label IF_TRUE16
+push constant 1
+pop local 27
+label IF_FALSE16
+push local 13
+push constant 16
+eq
+if-goto IF_TRUE17
+goto IF_FALSE17
+label IF_TRUE17
+push constant 1
+pop local 28
+label IF_FALSE17
+push local 12
+push constant 1
+add
+pop local 12
+goto WHILE_EXP9
+label WHILE_END9
+push constant 38
+push local 26
+push constant 100
+call Math.multiply 2
+push local 27
+push constant 10
+call Math.multiply 2
+add
+push local 28
+add
+push constant 11
+call Main.check 3
+pop temp 0
+push local 8
+call EntityManager.reset 1
+pop temp 0
+push constant 0
+pop local 30
+push constant 0
+pop local 12
+label WHILE_EXP10
+push local 12
+push constant 80
+lt
+not
+if-goto WHILE_END10
+push local 8
+push constant 1
+call EntityManager.updateEntities 2
+pop temp 0
+push constant 0
+pop local 13
+label WHILE_EXP11
+push local 13
+push constant 4
+lt
+not
+if-goto WHILE_END11
+push local 13
+push local 10
+add
+pop pointer 1
+push that 0
+pop local 2
+push local 2
+call Enemy.isActive 1
+if-goto IF_TRUE18
+goto IF_FALSE18
+label IF_TRUE18
+push local 2
+call Enemy.getType 1
+push constant 1
+eq
+not
+if-goto IF_TRUE19
+goto IF_FALSE19
+label IF_TRUE19
+push constant 1
+pop local 30
+label IF_FALSE19
+label IF_FALSE18
+push local 13
+push constant 1
+add
+pop local 13
+goto WHILE_EXP11
+label WHILE_END11
+push local 12
+push constant 1
+add
+pop local 12
+goto WHILE_EXP10
+label WHILE_END10
+push local 8
+call EntityManager.getActiveEnemyCount 1
+pop local 33
+push constant 39
+push local 33
+push constant 10
+call Math.multiply 2
+push local 30
+add
+push constant 20
+call Main.check 3
+pop temp 0
+push constant 0
+pop local 12
+label WHILE_EXP12
+push local 12
+push constant 40
+lt
+not
+if-goto WHILE_END12
+push local 8
+push constant 2
+call EntityManager.updateEntities 2
+pop temp 0
+push local 12
+push constant 1
+add
+pop local 12
+goto WHILE_EXP12
+label WHILE_END12
+push local 8
+call EntityManager.getActiveEnemyCount 1
+pop local 34
+push constant 40
+push local 34
+push constant 3
+call Main.check 3
+pop temp 0
+push local 8
+call EntityManager.reset 1
+pop temp 0
+push constant 0
+pop local 29
+push constant 0
+pop local 30
+push constant 0
+pop local 12
+label WHILE_EXP13
+push local 12
+push constant 160
+lt
+not
+if-goto WHILE_END13
+push local 8
+push constant 3
+call EntityManager.updateEntities 2
+pop temp 0
+push constant 0
+pop local 13
+label WHILE_EXP14
+push local 13
+push constant 4
+lt
+not
+if-goto WHILE_END14
+push local 13
+push local 10
+add
+pop pointer 1
+push that 0
+pop local 2
+push local 2
+call Enemy.isActive 1
+if-goto IF_TRUE20
+goto IF_FALSE20
+label IF_TRUE20
+push local 2
+call Enemy.getType 1
+push constant 1
+eq
+if-goto IF_TRUE21
+goto IF_FALSE21
+label IF_TRUE21
+push constant 1
+pop local 29
+label IF_FALSE21
+push local 2
+call Enemy.getType 1
+push constant 2
+eq
+if-goto IF_TRUE22
+goto IF_FALSE22
+label IF_TRUE22
+push constant 1
+pop local 30
+label IF_FALSE22
+label IF_FALSE20
+push local 13
+push constant 1
+add
+pop local 13
+goto WHILE_EXP14
+label WHILE_END14
+push local 12
+push constant 30
+eq
+push local 12
+push constant 60
+eq
+push local 12
+push constant 90
+eq
+or
+or
+if-goto IF_TRUE23
+goto IF_FALSE23
+label IF_TRUE23
+push constant 0
+push local 10
+add
+pop pointer 1
+push that 0
+pop local 2
+push local 2
+call Enemy.deactivate 1
+pop temp 0
+label IF_FALSE23
+push local 12
+push constant 1
+add
+pop local 12
+goto WHILE_EXP13
+label WHILE_END13
+push local 8
+call EntityManager.getActiveEnemyCount 1
+pop local 35
+push constant 41
+push local 35
+push constant 100
+call Math.multiply 2
+push local 29
+push constant 10
+call Math.multiply 2
+add
+push local 30
+add
+push constant 411
+call Main.check 3
+pop temp 0
+push local 8
+push constant 10
+push constant 10
+push constant 75
+push constant 12
+push constant 100
+neg
+push constant 2
+push constant 10
+call EntityManager.spawnProjectile 8
+pop temp 0
+push local 8
+push constant 20
+neg
+push constant 5
+push constant 65
+push constant 12
+neg
+push constant 80
+neg
+push constant 3
+push constant 15
+call EntityManager.spawnProjectile 8
+pop temp 0
+push local 8
+call EntityManager.reset 1
+pop temp 0
+push constant 0
+pop local 31
+push constant 0
+pop local 12
+label WHILE_EXP15
+push local 12
+push constant 5
+lt
+not
+if-goto WHILE_END15
+push local 12
+push local 11
+add
+pop pointer 1
+push that 0
+pop local 5
+push local 5
+call Projectile.isActive 1
+if-goto IF_TRUE24
+goto IF_FALSE24
+label IF_TRUE24
+push local 31
+push constant 1
+add
+pop local 31
+label IF_FALSE24
+push local 12
+push constant 1
+add
+pop local 12
+goto WHILE_EXP15
+label WHILE_END15
+push constant 42
+push local 8
+call EntityManager.getActiveEnemyCount 1
+push constant 10
+call Math.multiply 2
+push local 31
+add
+push constant 0
+call Main.check 3
+pop temp 0
+push constant 2049
+call Memory.peek 1
+push local 36
+sub
+pop local 37
+push constant 43
+push local 37
+push constant 0
+call Main.check 3
+pop temp 0
+push local 8
+call EntityManager.dispose 1
+pop temp 0
+call EntityManager.new 0
+pop local 9
+push local 9
+call EntityManager.reset 1
+pop temp 0
+push local 9
+call EntityManager.dispose 1
+pop temp 0
+push constant 44
+push constant 1
+push constant 1
+call Main.check 3
+pop temp 0
+push constant 8004
+push local 21
+call Memory.poke 2
+pop temp 0
+push constant 8005
+push local 22
+call Memory.poke 2
+pop temp 0
+push constant 8006
+push local 23
+call Memory.poke 2
+pop temp 0
+push constant 8007
+push local 24
+call Memory.poke 2
+pop temp 0
+push constant 8008
+push local 37
+call Memory.poke 2
+pop temp 0
+push constant 8009
+push local 33
+call Memory.poke 2
+pop temp 0
+push constant 8010
+push local 34
+call Memory.poke 2
+pop temp 0
+push constant 8011
+push local 35
+call Memory.poke 2
+pop temp 0
+push constant 0
+return

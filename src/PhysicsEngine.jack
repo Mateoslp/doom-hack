@@ -1,0 +1,127 @@
+/**
+ * PhysicsEngine.jack
+ * Servicio estatico puro de integracion cinematica discreta en punto fijo Q11.4
+ * para los proyectiles balisticos de HELLGATE 16 (Requisito Obligatorio #3 de
+ * Evaluacion / Modulo 4 / Capa 3 / Ficha Tecnica #10).
+ *
+ * Modelo matematico por tick (t -> t + 1) conforme al GDD Seccion F:
+ *   1. Avance axial:   z(t+1) = z(t) - vz; si z(t+1) < zNearClip (8), desactiva.
+ *   2. Gravedad:       vy(t+1) = min(vy(t) + g, maxVy) con g = +12, maxVy = 240.
+ *   3. Integracion:    fpX(t+1) = fpX(t) + vx(t),  fpY(t+1) = fpY(t) + vy(t+1).
+ *   4. Rebote suelo:   si fpY > +1440 -> fpY = +1440, vy = -((vy * 7) / 8), bounce++.
+ *   5. Rebote techo:   si fpY < -1440 -> fpY = -1440, vy = -vy, bounce++.
+ *   6. Rebote paredes: si |fpX| > 2560 -> fpX = +-2560, vx = -vx, bounce++.
+ *
+ * Seguridad 16 bits: |vy| <= 240 => |vy * 7| <= 1680 << 32767 (cero overflow).
+ * Clase estatica pura: 0 fields, 0 statics, sin dispose().
+ */
+class PhysicsEngine {
+
+    /**
+     * Ejecuta un paso de simulacion fisica sobre un proyectil individual activo.
+     * Modifica el proyectil exclusivamente mediante setKinematics, registerBounce
+     * y deactivate (Contrato #3).
+     */
+    function void updateProjectile(Projectile p) {
+        var int maxFx;
+        var int floorY;
+        var int ceilY;
+        var int maxV;
+        var int maxVx;
+        var int nextZ;
+        var int nextVx;
+        var int nextVy;
+        var int nextFpX;
+        var int nextFpY;
+
+        if (p = null) {
+            return;
+        }
+        if (~(p.isActive())) {
+            return;
+        }
+
+        // 1. Avance axial hacia la camara y recorte en el plano frontal zNearClip (8)
+        let nextZ = (p.getZ() - p.getVz());
+        if (nextZ < GameConstants.zNearClip()) {
+            do p.deactivate();
+            return;
+        }
+
+        let maxFx = GameConstants.fpMaxX();
+        let floorY = GameConstants.fpFloorY();
+        let ceilY = GameConstants.fpCeilY();
+        let maxV = GameConstants.maxVy();
+        let maxVx = GameConstants.corridorMaxX();
+
+        // 2. Aceleracion gravitacional constante (+12) acotada a velocidad terminal (+-240)
+        let nextVx = MathUtils.clamp(p.getVx(), (-maxVx), maxVx);
+        let nextVy = MathUtils.clamp(p.getVy(), (-maxV), maxV);
+        let nextVy = (nextVy + GameConstants.gravity());
+        if (nextVy > maxV) {
+            let nextVy = maxV;
+        }
+
+        // 3. Integracion discreta de posicion transversal en Q11.4
+        //    |nextFpX| <= 2560 + 160 = 2720 << 32767
+        //    |nextFpY| <= 1440 + 240 = 1680 << 32767
+        let nextFpX = (MathUtils.clamp(p.getFpX(), (-maxFx), maxFx) + nextVx);
+        let nextFpY = (MathUtils.clamp(p.getFpY(), ceilY, floorY) + nextVy);
+
+        // 4. Colision y rebote vertical contra suelo (inelastico e = 7/8) o techo (elastico)
+        if (nextFpY > floorY) {
+            let nextFpY = floorY;
+            let nextVy = (-((nextVy * GameConstants.restitutionNum()) / GameConstants.restitutionDen()));
+            do p.registerBounce();
+        } else {
+            if (nextFpY < ceilY) {
+                let nextFpY = ceilY;
+                let nextVy = (-nextVy);
+                do p.registerBounce();
+            }
+        }
+
+        // 5. Colision y rebote especular contra paredes izquierda (-2560) y derecha (+2560)
+        if (nextFpX < (-maxFx)) {
+            let nextFpX = (-maxFx);
+            let nextVx = (-nextVx);
+            do p.registerBounce();
+        } else {
+            if (nextFpX > maxFx) {
+                let nextFpX = maxFx;
+                let nextVx = (-nextVx);
+                do p.registerBounce();
+            }
+        }
+
+        // 6. Escritura atomica del nuevo estado cinematico validado
+        do p.setKinematics(nextFpX, nextFpY, nextZ, nextVx, nextVy);
+        return;
+    }
+
+    /**
+     * Actualiza en lote todos los proyectiles activos de un pool fijo de capacidad dada.
+     * Ignora de forma segura referencias nulas, capacidades <= 0 o ranuras inactivas.
+     */
+    function void updatePool(Array projectiles, int capacity) {
+        var int i;
+        var Projectile p;
+
+        if ((projectiles = null) | (~(capacity > 0))) {
+            return;
+        }
+
+        let i = 0;
+        while (i < capacity) {
+            let p = projectiles[i];
+            if (~(p = null)) {
+                if (p.isActive()) {
+                    do PhysicsEngine.updateProjectile(p);
+                }
+            }
+            let i = (i + 1);
+        }
+        return;
+    }
+}
+

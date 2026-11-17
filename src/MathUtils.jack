@@ -1,0 +1,191 @@
+/**
+ * MathUtils.jack
+ * Operaciones matematicas enteras seguras para arquitectura Hack de 16 bits con signo
+ * (rango [-32768, 32767]), conversiones de punto fijo Q11.4 (factor 16) y proyeccion
+ * perspectiva pseudo-3D.
+ *
+ * No duplica Math.abs, Math.min, Math.max ni Math.sqrt de la biblioteca estandar Jack OS.
+ */
+class MathUtils {
+
+    /**
+     * Limita val al intervalo cerrado [minVal, maxVal].
+     * Usa comparaciones directas (<, >) inmunes a desbordamiento por resta.
+     * Si por error minVal > maxVal, retorna minVal como guarda defensiva.
+     */
+    function int clamp(int val, int minVal, int maxVal) {
+        if (minVal > maxVal) {
+            return minVal;
+        }
+        if (val < minVal) {
+            return minVal;
+        }
+        if (val > maxVal) {
+            return maxVal;
+        }
+        return val;
+    }
+
+    /**
+     * Resto modular no negativo en [0, b - 1] para b > 0.
+     * Corrige el truncamiento hacia cero de Jack cuando a < 0 (ej. mod(-3, 16) = 13).
+     * Si b <= 0 retorna 0 para impedir Sys.error(3) por division entre cero.
+     */
+    function int mod(int a, int b) {
+        var int q;
+        var int rem;
+
+        if (~(b > 0)) {
+            return 0;
+        }
+        if (a < (-32767)) {
+            // Caso extremo a = -32768: evita overflow en Math.divide de Math.vm
+            let rem = MathUtils.mod(a + b, b);
+            return rem;
+        }
+
+        let q = (a / b);
+        let rem = (a - (q * b));
+        if (rem < 0) {
+            let rem = (rem + b);
+        }
+        return rem;
+    }
+
+    /**
+     * Distancia absoluta |a - b| protegida contra desbordamiento de 16 bits.
+     * Si la diferencia matematica real supera 32767 (ej. a = 20000, b = -20000),
+     * satura de forma segura a 32767 en lugar de envolver a un valor negativo.
+     */
+    function int absDiff(int a, int b) {
+        var int hi;
+        var int lo;
+        var int maxSafeHi;
+
+        if (a > b) {
+            let hi = a;
+            let lo = b;
+        } else {
+            let hi = b;
+            let lo = a;
+        }
+
+        if ((~(hi < 0)) & (lo < 0)) {
+            // Como lo < 0, (32767 + lo) pertenece a [-1, 32766] y nunca desborda.
+            let maxSafeHi = (32767 + lo);
+            if (hi > maxSafeHi) {
+                return 32767;
+            }
+        }
+
+        return (hi - lo);
+    }
+
+    /**
+     * Convierte un entero en unidades de mundo a punto fijo Q11.4 (val * 16).
+     * Rango seguro sin overflow de 16 bits: [-2047, +2047] -> [-32752, +32752].
+     * Valores fuera de ese rango se saturan con clamp para evitar envolver el signo
+     * (ej. 2048 * 16 produciria -32768 sin esta guarda).
+     */
+    function int toFixed(int val) {
+        var int safeVal;
+        let safeVal = MathUtils.clamp(val, -2047, 2047);
+        return (safeVal * GameConstants.fpScale());
+    }
+
+    /**
+     * Convierte un valor en punto fijo Q11.4 a unidades enteras de mundo (fpVal / 16).
+     * Comportamiento con negativos: respeta la division entera de Jack con truncamiento
+     * hacia cero (ej. 23 -> 1, 15 -> 0, -23 -> -1, -15 -> 0).
+     * Incluye guarda explicita para -32768 (donde Math.abs en Math.vm desborda).
+     */
+    function int fromFixed(int fpVal) {
+        if (fpVal < (-32767)) {
+            return -2048;
+        }
+        return (fpVal / GameConstants.fpScale());
+    }
+
+    /**
+     * Calcula la coordenada X del punto de fuga con paralaje inverso al jugador:
+     * vpX = 256 - (clamp(playerX, -160, 160) / 4), acotado en [216, 296].
+     */
+    function int computeVanishingX(int playerX) {
+        var int maxCorridor;
+        var int safePx;
+
+        let maxCorridor = GameConstants.corridorMaxX();
+        let safePx = MathUtils.clamp(playerX, (-maxCorridor), maxCorridor);
+        return (GameConstants.centerX() - (safePx / 4));
+    }
+
+    /**
+     * Proyecta coordenada horizontal 3D a pantalla:
+     * screenX = vpX + (((worldX - playerX) * 64) / max(z, zNearClip)).
+     * Acota worldX y playerX a [-255, 255] (contiene ampliamente el corredor [-160, 160])
+     * de modo que |dx| <= 510 y |dx * 64| <= 32640 <= 32767 (cero riesgo de overflow).
+     */
+    function int projectX(int worldX, int playerX, int vpX, int z) {
+        var int wx;
+        var int px;
+        var int dx;
+        var int safeZ;
+        var int num;
+
+        let wx = MathUtils.clamp(worldX, -255, 255);
+        let px = MathUtils.clamp(playerX, -255, 255);
+        let dx = (wx - px);
+
+        let safeZ = z;
+        if (safeZ < GameConstants.zNearClip()) {
+            let safeZ = GameConstants.zNearClip();
+        }
+
+        let num = (dx * GameConstants.focalLength());
+        return (vpX + (num / safeZ));
+    }
+
+    /**
+     * Proyecta coordenada vertical 3D a pantalla:
+     * screenY = horizonY + ((worldY * 64) / max(z, zNearClip)).
+     * Acota worldY a [-511, 511] (contiene el corredor [-90, 90]) para que
+     * |worldY * 64| <= 32704 <= 32767 (cero riesgo de overflow).
+     */
+    function int projectY(int worldY, int horizonY, int z) {
+        var int wy;
+        var int safeZ;
+        var int num;
+
+        let wy = MathUtils.clamp(worldY, -511, 511);
+
+        let safeZ = z;
+        if (safeZ < GameConstants.zNearClip()) {
+            let safeZ = GameConstants.zNearClip();
+        }
+
+        let num = (wy * GameConstants.focalLength());
+        return (horizonY + (num / safeZ));
+    }
+
+    /**
+     * Escala una dimension base en perspectiva inversa 1/z:
+     * projected = (clamp(baseSize, 0, 511) * 64) / max(z, zNearClip).
+     * El numerador maximo es 511 * 64 = 32704 <= 32767 (cero riesgo de overflow).
+     */
+    function int projectSize(int baseSize, int z) {
+        var int safeSize;
+        var int safeZ;
+        var int num;
+
+        let safeSize = MathUtils.clamp(baseSize, 0, 511);
+
+        let safeZ = z;
+        if (safeZ < GameConstants.zNearClip()) {
+            let safeZ = GameConstants.zNearClip();
+        }
+
+        let num = (safeSize * GameConstants.focalLength());
+        return (num / safeZ);
+    }
+}
+

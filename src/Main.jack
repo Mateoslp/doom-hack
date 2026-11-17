@@ -1,0 +1,21 @@
+/**
+ * Main.jack
+ * Punto de entrada unico del videojuego FPS pseudo-3D HELLGATE 16
+ * (Modulo 6 del Plan Modular de Desarrollo / Capa 5 / Ficha Tecnica #1).
+ *
+ * Construye la instancia raiz de DoomGame, ejecuta el bucle principal interactivo
+ * y libera simetricamente toda la memoria dinamica al finalizar.
+ */
+class Main {
+
+    /** Punto de entrada invocado por Sys.init al arrancar la maquina virtual Hack. */
+    function void main() {
+        var DoomGame game;
+
+        let game = DoomGame.new();
+        do game.run();
+        do game.dispose();
+        return;
+    }
+}
+

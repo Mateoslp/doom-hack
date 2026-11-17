@@ -1,0 +1,468 @@
+/**
+ * Renderer.jack
+ * Coordinador visual de escena activa de HELLGATE 16: ordenamiento pintor
+ * back-to-front por profundidad z sin asignaciones dinamicas, renderizado
+ * procedural pseudo-3D de enemigos (Tipo 1 / Tipo 2 / flash de impacto) y
+ * proyectiles fisicos, mira tactica, arma en primera persona con retroceso y
+ * fogonazo, y delegacion diferencial al HUD
+ * (Modulo 5 del Plan Modular de Desarrollo / Capa 4 / Ficha Tecnica #15).
+ *
+ * Propiedades criticas de ingenieria:
+ *   1. Todo trazo en escena 3D utiliza exclusivamente WorldRenderer.drawSafeRect,
+ *      drawSafeLine y drawSafeCircle (recortados a [0..511] x [0..206]), haciendo
+ *      imposible escribir sobre el HUD (y >= 207) o disparar Sys.error(7..13).
+ *   2. Limpieza integral de pixeles residuales en cada fotograma mediante
+ *      world.renderCorridor(vpX) antes de pintar entidades de atras hacia adelante.
+ *   3. Preasigna unicamente sortIdx[4] en new() y lo libera en dispose() sin
+ *      liberar world ni hud (propiedad de DoomGame). Cero allocs en el game loop.
+ */
+class Renderer {
+
+    field WorldRenderer world;
+    field HUD hud;
+    field Array sortIdx;
+
+    /** Inicializa el coordinador visual enlazando WorldRenderer y HUD y reservando sortIdx[4]. */
+    constructor Renderer new(WorldRenderer worldRef, HUD hudRef) {
+        var int i;
+        var int maxE;
+
+        let world = worldRef;
+        let hud = hudRef;
+        let maxE = GameConstants.maxEnemies();
+        let sortIdx = Array.new(maxE);
+
+        let i = 0;
+        while (i < maxE) {
+            let sortIdx[i] = i;
+            let i = (i + 1);
+        }
+        return this;
+    }
+
+    /**
+     * Renderiza un fotograma completo del estado PLAYING aplicando algoritmo del pintor:
+     *   1. Corredor pseudo-3D movil (limpiando residuos previos del viewport 0..206).
+     *   2. Enemigos y proyectiles activos intercalados de mayor z (fondo) a menor z (frente).
+     *   3. Mira central y canon de plasma en primer plano.
+     *   4. Sincronizacion diferencial del HUD inferior (y: 207..255) si isDirty == true.
+     */
+    method void renderPlayingFrame(Player player, EntityManager entities, ScoreManager scores) {
+        var int playerX;
+        var int vpX;
+        var Array enemies;
+        var Array projectiles;
+        var int maxE;
+        var int maxP;
+        var int i;
+        var int pIdx;
+        var int upperZ;
+        var int ez;
+        var int pz;
+        var Enemy e;
+        var Projectile p;
+
+        if (player = null) {
+            return;
+        }
+
+        let playerX = player.getX();
+        let vpX = MathUtils.computeVanishingX(playerX);
+
+        // 1. Limpieza del viewport 0..206 y trazado del corredor dinamico
+        if (~(world = null)) {
+            do world.renderCorridor(vpX);
+        }
+
+        // 2. Entidades 3D ordenadas de atras hacia adelante (algoritmo del pintor exacto)
+        if (~(entities = null)) {
+            let enemies = entities.getEnemies();
+            let projectiles = entities.getProjectiles();
+            let maxE = GameConstants.maxEnemies();
+            let maxP = GameConstants.maxProjectiles();
+
+            do sortEnemiesByDepth(enemies);
+
+            let upperZ = 32767;
+            if (~(enemies = null)) {
+                let i = 0;
+                while (i < maxE) {
+                    let e = enemies[sortIdx[i]];
+                    if (~(e = null)) {
+                        if (e.isActive()) {
+                            let ez = e.getZ();
+
+                            // Dibujar proyectiles mas lejanos que este enemigo: ez < pz <= upperZ
+                            if (~(projectiles = null)) {
+                                let pIdx = 0;
+                                while (pIdx < maxP) {
+                                    let p = projectiles[pIdx];
+                                    if (~(p = null)) {
+                                        if (p.isActive()) {
+                                            let pz = p.getZ();
+                                            if ((pz > ez) & (~(pz > upperZ))) {
+                                                do renderProjectile(p, playerX, vpX);
+                                            }
+                                        }
+                                    }
+                                    let pIdx = (pIdx + 1);
+                                }
+                            }
+
+                            do renderEnemy(e, playerX, vpX);
+                            let upperZ = ez;
+                        }
+                    }
+                    let i = (i + 1);
+                }
+            }
+
+            // Dibujar proyectiles restantes en primer plano (pz <= upperZ)
+            if (~(projectiles = null)) {
+                let pIdx = 0;
+                while (pIdx < maxP) {
+                    let p = projectiles[pIdx];
+                    if (~(p = null)) {
+                        if (p.isActive()) {
+                            let pz = p.getZ();
+                            if (~(pz > upperZ)) {
+                                do renderProjectile(p, playerX, vpX);
+                            }
+                        }
+                    }
+                    let pIdx = (pIdx + 1);
+                }
+            }
+        }
+
+        // 3. Arma en primera persona y mira tactica
+        do renderWeaponAndCrosshair(player);
+
+        // 4. Sincronizacion diferencial del HUD estatico (solo actua si isDirty == true)
+        if (~(hud = null)) {
+            do hud.updateIfNeeded(player, scores, GameState.playing());
+        }
+        return;
+    }
+
+    /**
+     * [Interno] Ordena in-place los indices sortIdx[0..3] por profundidad z descendente
+     * (los enemigos activos mas lejanos primero; las ranuras inactivas al final con z = -1).
+     */
+    method void sortEnemiesByDepth(Array enemies) {
+        var int maxE;
+        var int i;
+        var int j;
+        var int keyIdx;
+        var int keyZ;
+        var int curIdx;
+        var int curZ;
+        var Enemy keyEnemy;
+        var Enemy curEnemy;
+        var boolean shifting;
+
+        let maxE = GameConstants.maxEnemies();
+        let i = 0;
+        while (i < maxE) {
+            let sortIdx[i] = i;
+            let i = (i + 1);
+        }
+
+        if (enemies = null) {
+            return;
+        }
+
+        let i = 1;
+        while (i < maxE) {
+            let keyIdx = sortIdx[i];
+            let keyEnemy = enemies[keyIdx];
+            let keyZ = -1;
+            if (~(keyEnemy = null)) {
+                if (keyEnemy.isActive()) {
+                    let keyZ = keyEnemy.getZ();
+                }
+            }
+
+            let j = (i - 1);
+            let shifting = true;
+            while ((~(j < 0)) & shifting) {
+                let curIdx = sortIdx[j];
+                let curEnemy = enemies[curIdx];
+                let curZ = -1;
+                if (~(curEnemy = null)) {
+                    if (curEnemy.isActive()) {
+                        let curZ = curEnemy.getZ();
+                    }
+                }
+
+                if (curZ < keyZ) {
+                    let sortIdx[(j + 1)] = curIdx;
+                    let j = (j - 1);
+                } else {
+                    let shifting = false;
+                }
+            }
+            let sortIdx[(j + 1)] = keyIdx;
+            let i = (i + 1);
+        }
+        return;
+    }
+
+    /**
+     * Renderiza en perspectiva 1/z la silueta procedural de un enemigo activo
+     * (cabeza con cuernos diagonales, ojos blancos en 1-bit, torso, brazos y piernas),
+     * aplicando inversion blanca de torso cuando isHitFlashing() es verdadero y
+     * blindaje pectoral adicional para el Tipo 2 (Bruto Igneo).
+     */
+    method void renderEnemy(Enemy e, int playerX, int vpX) {
+        var int ez;
+        var int cx;
+        var int cy;
+        var int halfW;
+        var int halfH;
+        var int left;
+        var int right;
+        var int top;
+        var int bot;
+        var int headHalfW;
+        var int headTop;
+        var int headBot;
+        var int torsoLeft;
+        var int torsoRight;
+        var int torsoTop;
+        var int torsoBot;
+        var int legW;
+        var int armTop;
+        var int armBot;
+        var int hornH;
+        var int eyeY1;
+        var int eyeY2;
+        var int eyeOffX;
+        var int eyeHalfW;
+        var int maxScreenX;
+        var int maxViewY;
+
+        if (e = null) {
+            return;
+        }
+        if (~(e.isActive())) {
+            return;
+        }
+
+        let ez = e.getZ();
+        let cx = MathUtils.projectX(e.getWorldX(), playerX, vpX, ez);
+        let cy = MathUtils.projectY(e.getWorldY(), GameConstants.baseHorizonY(), ez);
+        let halfW = MathUtils.projectSize(e.getBaseWidth(), ez);
+        let halfH = MathUtils.projectSize(e.getBaseHeight(), ez);
+
+        if (halfW < 4) {
+            let halfW = 4;
+        }
+        if (halfH < 6) {
+            let halfH = 6;
+        }
+
+        let left = (cx - halfW);
+        let right = (cx + halfW);
+        let top = (cy - halfH);
+        let bot = (cy + halfH);
+        let hornH = (halfH / 3);
+        if (hornH < 3) {
+            let hornH = 3;
+        }
+
+        let maxScreenX = (GameConstants.screenWidth() - 1);
+        let maxViewY = GameConstants.viewportBottom();
+        if ((right < 0) | (left > maxScreenX)) {
+            return;
+        }
+        if ((bot < 0) | ((top - hornH) > maxViewY)) {
+            return;
+        }
+
+        let headHalfW = ((halfW * 3) / 5);
+        if (headHalfW < 3) {
+            let headHalfW = 3;
+        }
+        let headTop = top;
+        let headBot = (top + ((halfH * 2) / 5));
+
+        let torsoLeft = (cx - ((halfW * 4) / 5));
+        let torsoRight = (cx + ((halfW * 4) / 5));
+        let torsoTop = headBot;
+        let torsoBot = (bot - (halfH / 4));
+        if (torsoBot < torsoTop) {
+            let torsoBot = torsoTop;
+        }
+
+        let legW = (halfW / 3);
+        if (legW < 2) {
+            let legW = 2;
+        }
+
+        let armTop = (torsoTop + (halfH / 6));
+        let armBot = (torsoTop + ((halfH * 3) / 5));
+        if (armBot < armTop) {
+            let armBot = armTop;
+        }
+
+        // Silueta negra principal (ocluye lineas del corredor y entidades lejanas)
+        do Screen.setColor(true);
+        do WorldRenderer.drawSafeRect((cx - headHalfW), headTop, (cx + headHalfW), headBot);
+        do WorldRenderer.drawSafeRect(torsoLeft, torsoTop, torsoRight, torsoBot);
+        do WorldRenderer.drawSafeRect(left, armTop, torsoLeft, armBot);
+        do WorldRenderer.drawSafeRect(torsoRight, armTop, right, armBot);
+        do WorldRenderer.drawSafeRect(torsoLeft, torsoBot, (torsoLeft + legW), bot);
+        do WorldRenderer.drawSafeRect((torsoRight - legW), torsoBot, torsoRight, bot);
+
+        // Cuernos diagonales demoniacos (GDD Seccion E.3)
+        do WorldRenderer.drawSafeLine((cx - headHalfW), (headTop + 1), left, (headTop - hornH));
+        do WorldRenderer.drawSafeLine((cx + headHalfW), (headTop + 1), right, (headTop - hornH));
+
+        // Ojos rectangulares blancos en alto contraste 1-bit
+        let eyeY1 = (headTop + (halfH / 7));
+        let eyeY2 = ((eyeY1 + (halfH / 8)) + 1);
+        let eyeOffX = (headHalfW / 2);
+        let eyeHalfW = (headHalfW / 4);
+        if (eyeHalfW < 1) {
+            let eyeHalfW = 1;
+        }
+
+        do Screen.setColor(false);
+        do WorldRenderer.drawSafeRect(((cx - eyeOffX) - eyeHalfW), eyeY1, ((cx - eyeOffX) + eyeHalfW), eyeY2);
+        do WorldRenderer.drawSafeRect(((cx + eyeOffX) - eyeHalfW), eyeY1, ((cx + eyeOffX) + eyeHalfW), eyeY2);
+
+        // Feedback visual de impacto (inversion blanca del torso) o blindaje Tipo 2
+        if (e.isHitFlashing()) {
+            if (((torsoLeft + 2) < (torsoRight - 2)) & ((torsoTop + 2) < (torsoBot - 2))) {
+                do WorldRenderer.drawSafeRect((torsoLeft + 2), (torsoTop + 2), (torsoRight - 2), (torsoBot - 2));
+            }
+        } else {
+            if (e.getType() = 2) {
+                if ((torsoLeft + 3) < (torsoRight - 3)) {
+                    do WorldRenderer.drawSafeLine((torsoLeft + 3), ((torsoTop + torsoBot) / 2), (torsoRight - 3), ((torsoTop + torsoBot) / 2));
+                }
+            }
+        }
+
+        do Screen.setColor(true);
+        return;
+    }
+
+    /**
+     * Renderiza un proyectil balistico activo con radio escalado r = max(2, 160 / z)
+     * conforme al GDD Seccion F.4 y nucleo blanco de contraste para visibilidad sobre
+     * pisos y paredes.
+     */
+    method void renderProjectile(Projectile p, int playerX, int vpX) {
+        var int pz;
+        var int safeZ;
+        var int cx;
+        var int cy;
+        var int r;
+
+        if (p = null) {
+            return;
+        }
+        if (~(p.isActive())) {
+            return;
+        }
+
+        let pz = p.getZ();
+        let safeZ = pz;
+        if (safeZ < GameConstants.zNearClip()) {
+            let safeZ = GameConstants.zNearClip();
+        }
+
+        let cx = MathUtils.projectX(p.getWorldX(), playerX, vpX, safeZ);
+        let cy = MathUtils.projectY(p.getWorldY(), GameConstants.baseHorizonY(), safeZ);
+        let r = (160 / safeZ);
+        if (r < 2) {
+            let r = 2;
+        }
+
+        do Screen.setColor(true);
+        do WorldRenderer.drawSafeCircle(cx, cy, r);
+
+        if (r > 3) {
+            do Screen.setColor(false);
+            do WorldRenderer.drawSafeCircle(cx, cy, (r / 2));
+            do Screen.setColor(true);
+        }
+        return;
+    }
+
+    /**
+     * Dibuja el canon de plasma inferior en x in [232, 280], y in [168 + recoil, 206]
+     * (incluyendo fogonazo geometrico si isMuzzleFlashing() == true) y la cruz tactica
+     * de 4 segmentos alrededor de (256, aimY) con centro despejado de 5x5 px (GDD C.1).
+     */
+    method void renderWeaponAndCrosshair(Player player) {
+        var int cx;
+        var int aimY;
+        var int recoil;
+        var int topY;
+        var int midY;
+        var int botY;
+
+        if (player = null) {
+            return;
+        }
+
+        let cx = GameConstants.centerX();
+        let aimY = MathUtils.clamp(player.getAimY(), GameConstants.aimMinY(), GameConstants.aimMaxY());
+        let recoil = MathUtils.clamp(player.getRecoilOffset(), 0, 12);
+        let topY = (168 + recoil);
+        let midY = (184 + recoil);
+        let botY = GameConstants.viewportBottom();
+
+        // 1. Fogonazo geometrico frontal durante flashTimer > 0 (2 ticks tras disparar)
+        if (player.isMuzzleFlashing()) {
+            do Screen.setColor(true);
+            do WorldRenderer.drawSafeLine(238, (topY - 4), 274, (topY - 4));
+            do WorldRenderer.drawSafeLine(cx, (topY - 16), cx, (topY - 1));
+            do WorldRenderer.drawSafeLine(243, (topY - 13), 269, (topY + 1));
+            do WorldRenderer.drawSafeLine(269, (topY - 13), 243, (topY + 1));
+            do WorldRenderer.drawSafeRect(248, (topY - 9), 264, (topY - 1));
+            do Screen.setColor(false);
+            do WorldRenderer.drawSafeRect(251, (topY - 7), 261, (topY - 2));
+            do Screen.setColor(true);
+        }
+
+        // 2. Limpieza interior blanca del chasis para ocluir las guias del suelo
+        do Screen.setColor(false);
+        do WorldRenderer.drawSafeRect(232, midY, 280, botY);
+        do WorldRenderer.drawSafeRect(242, topY, 270, midY);
+
+        // 3. Chasis rectangular y canon doble convergente en negro (x: 232..280, y: topY..206)
+        do Screen.setColor(true);
+        do WorldRenderer.drawSafeRect(232, midY, 239, botY);
+        do WorldRenderer.drawSafeRect(273, midY, 280, botY);
+        do WorldRenderer.drawSafeRect(232, midY, 280, (midY + 2));
+        do WorldRenderer.drawSafeLine(232, botY, 280, botY);
+        do WorldRenderer.drawSafeRect(253, (midY + 5), 259, (botY - 1));
+
+        do WorldRenderer.drawSafeLine(236, midY, 244, topY);
+        do WorldRenderer.drawSafeLine(252, midY, 253, topY);
+        do WorldRenderer.drawSafeLine(276, midY, 268, topY);
+        do WorldRenderer.drawSafeLine(260, midY, 259, topY);
+        do WorldRenderer.drawSafeRect(244, topY, 268, (topY + 2));
+
+        // 4. Punto de mira (Crosshair): 4 segmentos dejando despejado [254..258] x [aimY-2..aimY+2]
+        do WorldRenderer.drawSafeLine((cx - 9), aimY, (cx - 3), aimY);
+        do WorldRenderer.drawSafeLine((cx + 3), aimY, (cx + 9), aimY);
+        do WorldRenderer.drawSafeLine(cx, (aimY - 9), cx, (aimY - 3));
+        do WorldRenderer.drawSafeLine(cx, (aimY + 3), cx, (aimY + 9));
+        return;
+    }
+
+    /** Libera el arreglo auxiliar sortIdx[4] y esta instancia (world y hud pertenecen a DoomGame). */
+    method void dispose() {
+        if (~(sortIdx = null)) {
+            do sortIdx.dispose();
+        }
+        do Memory.deAlloc(this);
+        return;
+    }
+}
+

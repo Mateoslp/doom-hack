@@ -1,0 +1,12 @@
+function GameState.menu 0
+push constant 0
+return
+function GameState.playing 0
+push constant 1
+return
+function GameState.paused 0
+push constant 2
+return
+function GameState.gameOver 0
+push constant 3
+return

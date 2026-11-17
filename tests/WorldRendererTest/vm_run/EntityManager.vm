@@ -1,0 +1,655 @@
+function EntityManager.new 3
+push constant 4
+call Memory.alloc 1
+pop pointer 0
+call GameConstants.maxEnemies 0
+pop local 1
+call GameConstants.maxProjectiles 0
+pop local 2
+push local 1
+call Array.new 1
+pop this 0
+push constant 0
+pop local 0
+label WHILE_EXP0
+push local 0
+push local 1
+lt
+not
+if-goto WHILE_END0
+push local 0
+push this 0
+add
+call Enemy.new 0
+pop temp 0
+pop pointer 1
+push temp 0
+pop that 0
+push local 0
+push constant 1
+add
+pop local 0
+goto WHILE_EXP0
+label WHILE_END0
+push local 2
+call Array.new 1
+pop this 1
+push constant 0
+pop local 0
+label WHILE_EXP1
+push local 0
+push local 2
+lt
+not
+if-goto WHILE_END1
+push local 0
+push this 1
+add
+call Projectile.new 0
+pop temp 0
+pop pointer 1
+push temp 0
+pop that 0
+push local 0
+push constant 1
+add
+pop local 0
+goto WHILE_EXP1
+label WHILE_END1
+push constant 137
+pop this 3
+push constant 6
+pop this 2
+push pointer 0
+return
+function EntityManager.reset 5
+push argument 0
+pop pointer 0
+call GameConstants.maxEnemies 0
+pop local 1
+push constant 0
+pop local 0
+label WHILE_EXP0
+push local 0
+push local 1
+lt
+not
+if-goto WHILE_END0
+push local 0
+push this 0
+add
+pop pointer 1
+push that 0
+pop local 3
+push local 3
+push constant 0
+eq
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push local 3
+call Enemy.deactivate 1
+pop temp 0
+label IF_FALSE0
+push local 0
+push constant 1
+add
+pop local 0
+goto WHILE_EXP0
+label WHILE_END0
+call GameConstants.maxProjectiles 0
+pop local 2
+push constant 0
+pop local 0
+label WHILE_EXP1
+push local 0
+push local 2
+lt
+not
+if-goto WHILE_END1
+push local 0
+push this 1
+add
+pop pointer 1
+push that 0
+pop local 4
+push local 4
+push constant 0
+eq
+not
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push local 4
+call Projectile.deactivate 1
+pop temp 0
+label IF_FALSE1
+push local 0
+push constant 1
+add
+pop local 0
+goto WHILE_EXP1
+label WHILE_END1
+push constant 6
+pop this 2
+push this 3
+push constant 0
+gt
+not
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push constant 137
+pop this 3
+label IF_FALSE2
+push constant 0
+return
+function EntityManager.tickSeed 0
+push argument 0
+pop pointer 0
+push this 3
+push constant 37
+add
+push constant 16383
+and
+pop this 3
+push this 3
+push constant 0
+eq
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 137
+pop this 3
+label IF_FALSE0
+push constant 0
+return
+function EntityManager.nextRandomBounded 0
+push argument 0
+pop pointer 0
+push this 3
+push constant 255
+and
+push constant 109
+call Math.multiply 2
+push constant 89
+add
+push constant 16383
+and
+pop this 3
+push argument 1
+push constant 1
+gt
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+push this 3
+push argument 1
+call MathUtils.mod 2
+return
+function EntityManager.updateEntities 9
+push argument 0
+pop pointer 0
+call GameConstants.maxEnemies 0
+pop local 1
+push constant 0
+pop local 0
+label WHILE_EXP0
+push local 0
+push local 1
+lt
+not
+if-goto WHILE_END0
+push local 0
+push this 0
+add
+pop pointer 1
+push that 0
+pop local 2
+push local 2
+push constant 0
+eq
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push local 2
+call Enemy.isActive 1
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push local 2
+call Enemy.update 1
+pop temp 0
+label IF_FALSE1
+label IF_FALSE0
+push local 0
+push constant 1
+add
+pop local 0
+goto WHILE_EXP0
+label WHILE_END0
+push argument 1
+pop local 3
+push local 3
+push constant 1
+lt
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push constant 1
+pop local 3
+label IF_FALSE2
+push local 3
+push constant 1
+eq
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push constant 2
+pop local 4
+push constant 24
+pop local 5
+goto IF_END3
+label IF_FALSE3
+push local 3
+push constant 2
+eq
+if-goto IF_TRUE4
+goto IF_FALSE4
+label IF_TRUE4
+push constant 3
+pop local 4
+push constant 20
+pop local 5
+goto IF_END4
+label IF_FALSE4
+push local 1
+pop local 4
+push constant 16
+pop local 5
+label IF_END4
+label IF_END3
+push pointer 0
+call EntityManager.getActiveEnemyCount 1
+push local 4
+lt
+if-goto IF_TRUE5
+goto IF_FALSE5
+label IF_TRUE5
+push this 2
+push constant 0
+gt
+if-goto IF_TRUE6
+goto IF_FALSE6
+label IF_TRUE6
+push this 2
+push constant 1
+sub
+pop this 2
+goto IF_END6
+label IF_FALSE6
+push pointer 0
+push constant 257
+call EntityManager.nextRandomBounded 2
+push constant 128
+sub
+pop local 6
+push local 3
+push constant 1
+eq
+if-goto IF_TRUE7
+goto IF_FALSE7
+label IF_TRUE7
+push constant 1
+pop local 8
+push pointer 0
+push constant 5
+call EntityManager.nextRandomBounded 2
+push constant 2
+sub
+pop local 7
+goto IF_END7
+label IF_FALSE7
+push local 3
+push constant 2
+eq
+if-goto IF_TRUE8
+goto IF_FALSE8
+label IF_TRUE8
+push pointer 0
+push constant 3
+call EntityManager.nextRandomBounded 2
+push constant 0
+eq
+if-goto IF_TRUE9
+goto IF_FALSE9
+label IF_TRUE9
+push constant 2
+pop local 8
+goto IF_END9
+label IF_FALSE9
+push constant 1
+pop local 8
+label IF_END9
+goto IF_END8
+label IF_FALSE8
+push pointer 0
+push constant 2
+call EntityManager.nextRandomBounded 2
+push constant 0
+eq
+if-goto IF_TRUE10
+goto IF_FALSE10
+label IF_TRUE10
+push constant 2
+pop local 8
+goto IF_END10
+label IF_FALSE10
+push constant 1
+pop local 8
+label IF_END10
+label IF_END8
+push pointer 0
+push constant 9
+call EntityManager.nextRandomBounded 2
+push constant 4
+sub
+pop local 7
+push local 7
+push constant 0
+eq
+if-goto IF_TRUE11
+goto IF_FALSE11
+label IF_TRUE11
+push constant 2
+pop local 7
+label IF_FALSE11
+label IF_END7
+push pointer 0
+push local 8
+push local 6
+call GameConstants.zSpawn 0
+push local 7
+call EntityManager.spawnEnemy 5
+pop temp 0
+push local 5
+pop this 2
+label IF_END6
+label IF_FALSE5
+push constant 0
+return
+function EntityManager.updateProjectilesPhysics 0
+push argument 0
+pop pointer 0
+push this 1
+call GameConstants.maxProjectiles 0
+call PhysicsEngine.updatePool 2
+pop temp 0
+push constant 0
+return
+function EntityManager.spawnEnemy 3
+push argument 0
+pop pointer 0
+call GameConstants.maxEnemies 0
+pop local 1
+push constant 0
+pop local 0
+label WHILE_EXP0
+push local 0
+push local 1
+lt
+not
+if-goto WHILE_END0
+push local 0
+push this 0
+add
+pop pointer 1
+push that 0
+pop local 2
+push local 2
+push constant 0
+eq
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push local 2
+call Enemy.isActive 1
+not
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push local 2
+push argument 1
+push argument 2
+push argument 3
+push argument 4
+call Enemy.spawn 5
+pop temp 0
+push constant 0
+not
+return
+label IF_FALSE1
+label IF_FALSE0
+push local 0
+push constant 1
+add
+pop local 0
+goto WHILE_EXP0
+label WHILE_END0
+push constant 0
+return
+function EntityManager.spawnProjectile 3
+push argument 0
+pop pointer 0
+call GameConstants.maxProjectiles 0
+pop local 1
+push constant 0
+pop local 0
+label WHILE_EXP0
+push local 0
+push local 1
+lt
+not
+if-goto WHILE_END0
+push local 0
+push this 1
+add
+pop pointer 1
+push that 0
+pop local 2
+push local 2
+push constant 0
+eq
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push local 2
+call Projectile.isActive 1
+not
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push local 2
+push argument 1
+push argument 2
+push argument 3
+push argument 4
+push argument 5
+push argument 6
+push argument 7
+call Projectile.spawn 8
+pop temp 0
+push constant 0
+not
+return
+label IF_FALSE1
+label IF_FALSE0
+push local 0
+push constant 1
+add
+pop local 0
+goto WHILE_EXP0
+label WHILE_END0
+push constant 0
+return
+function EntityManager.getEnemies 0
+push argument 0
+pop pointer 0
+push this 0
+return
+function EntityManager.getProjectiles 0
+push argument 0
+pop pointer 0
+push this 1
+return
+function EntityManager.getActiveEnemyCount 4
+push argument 0
+pop pointer 0
+call GameConstants.maxEnemies 0
+pop local 1
+push constant 0
+pop local 2
+push constant 0
+pop local 0
+label WHILE_EXP0
+push local 0
+push local 1
+lt
+not
+if-goto WHILE_END0
+push local 0
+push this 0
+add
+pop pointer 1
+push that 0
+pop local 3
+push local 3
+push constant 0
+eq
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push local 3
+call Enemy.isActive 1
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push local 2
+push constant 1
+add
+pop local 2
+label IF_FALSE1
+label IF_FALSE0
+push local 0
+push constant 1
+add
+pop local 0
+goto WHILE_EXP0
+label WHILE_END0
+push local 2
+return
+function EntityManager.dispose 5
+push argument 0
+pop pointer 0
+push this 0
+push constant 0
+eq
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+call GameConstants.maxEnemies 0
+pop local 1
+push constant 0
+pop local 0
+label WHILE_EXP0
+push local 0
+push local 1
+lt
+not
+if-goto WHILE_END0
+push local 0
+push this 0
+add
+pop pointer 1
+push that 0
+pop local 3
+push local 3
+push constant 0
+eq
+not
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push local 3
+call Enemy.dispose 1
+pop temp 0
+label IF_FALSE1
+push local 0
+push constant 1
+add
+pop local 0
+goto WHILE_EXP0
+label WHILE_END0
+push this 0
+call Array.dispose 1
+pop temp 0
+label IF_FALSE0
+push this 1
+push constant 0
+eq
+not
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+call GameConstants.maxProjectiles 0
+pop local 2
+push constant 0
+pop local 0
+label WHILE_EXP1
+push local 0
+push local 2
+lt
+not
+if-goto WHILE_END1
+push local 0
+push this 1
+add
+pop pointer 1
+push that 0
+pop local 4
+push local 4
+push constant 0
+eq
+not
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push local 4
+call Projectile.dispose 1
+pop temp 0
+label IF_FALSE3
+push local 0
+push constant 1
+add
+pop local 0
+goto WHILE_EXP1
+label WHILE_END1
+push this 1
+call Array.dispose 1
+pop temp 0
+label IF_FALSE2
+push pointer 0
+call Memory.deAlloc 1
+pop temp 0
+push constant 0
+return

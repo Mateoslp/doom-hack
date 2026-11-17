@@ -1,0 +1,260 @@
+function MathUtils.clamp 0
+push argument 1
+push argument 2
+gt
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push argument 1
+return
+label IF_FALSE0
+push argument 0
+push argument 1
+lt
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push argument 1
+return
+label IF_FALSE1
+push argument 0
+push argument 2
+gt
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push argument 2
+return
+label IF_FALSE2
+push argument 0
+return
+function MathUtils.mod 2
+push argument 1
+push constant 0
+gt
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+push argument 0
+push constant 32767
+neg
+lt
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push argument 0
+push argument 1
+add
+push argument 1
+call MathUtils.mod 2
+pop local 1
+push local 1
+return
+label IF_FALSE1
+push argument 0
+push argument 1
+call Math.divide 2
+pop local 0
+push argument 0
+push local 0
+push argument 1
+call Math.multiply 2
+sub
+pop local 1
+push local 1
+push constant 0
+lt
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push local 1
+push argument 1
+add
+pop local 1
+label IF_FALSE2
+push local 1
+return
+function MathUtils.absDiff 3
+push argument 0
+push argument 1
+gt
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push argument 0
+pop local 0
+push argument 1
+pop local 1
+goto IF_END0
+label IF_FALSE0
+push argument 1
+pop local 0
+push argument 0
+pop local 1
+label IF_END0
+push local 0
+push constant 0
+lt
+not
+push local 1
+push constant 0
+lt
+and
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push constant 32767
+push local 1
+add
+pop local 2
+push local 0
+push local 2
+gt
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push constant 32767
+return
+label IF_FALSE2
+label IF_FALSE1
+push local 0
+push local 1
+sub
+return
+function MathUtils.toFixed 1
+push argument 0
+push constant 2047
+neg
+push constant 2047
+call MathUtils.clamp 3
+pop local 0
+push local 0
+call GameConstants.fpScale 0
+call Math.multiply 2
+return
+function MathUtils.fromFixed 0
+push argument 0
+push constant 32767
+neg
+lt
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 2048
+neg
+return
+label IF_FALSE0
+push argument 0
+call GameConstants.fpScale 0
+call Math.divide 2
+return
+function MathUtils.computeVanishingX 2
+call GameConstants.corridorMaxX 0
+pop local 0
+push argument 0
+push local 0
+neg
+push local 0
+call MathUtils.clamp 3
+pop local 1
+call GameConstants.centerX 0
+push local 1
+push constant 4
+call Math.divide 2
+sub
+return
+function MathUtils.projectX 5
+push argument 0
+push constant 255
+neg
+push constant 255
+call MathUtils.clamp 3
+pop local 0
+push argument 1
+push constant 255
+neg
+push constant 255
+call MathUtils.clamp 3
+pop local 1
+push local 0
+push local 1
+sub
+pop local 2
+push argument 3
+pop local 3
+push local 3
+call GameConstants.zNearClip 0
+lt
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+call GameConstants.zNearClip 0
+pop local 3
+label IF_FALSE0
+push local 2
+call GameConstants.focalLength 0
+call Math.multiply 2
+pop local 4
+push argument 2
+push local 4
+push local 3
+call Math.divide 2
+add
+return
+function MathUtils.projectY 3
+push argument 0
+push constant 511
+neg
+push constant 511
+call MathUtils.clamp 3
+pop local 0
+push argument 2
+pop local 1
+push local 1
+call GameConstants.zNearClip 0
+lt
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+call GameConstants.zNearClip 0
+pop local 1
+label IF_FALSE0
+push local 0
+call GameConstants.focalLength 0
+call Math.multiply 2
+pop local 2
+push argument 1
+push local 2
+push local 1
+call Math.divide 2
+add
+return
+function MathUtils.projectSize 3
+push argument 0
+push constant 0
+push constant 511
+call MathUtils.clamp 3
+pop local 0
+push argument 1
+pop local 1
+push local 1
+call GameConstants.zNearClip 0
+lt
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+call GameConstants.zNearClip 0
+pop local 1
+label IF_FALSE0
+push local 0
+call GameConstants.focalLength 0
+call Math.multiply 2
+pop local 2
+push local 2
+push local 1
+call Math.divide 2
+return

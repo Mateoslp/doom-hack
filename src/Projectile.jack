@@ -1,0 +1,166 @@
+/**
+ * Projectile.jack
+ * Entidad reutilizable de proyectil enemigo (Orbe de Magma Balistico) con estado
+ * cinematico discreto en punto fijo Q11.4 (factor SCALE = 16)
+ * (Modulo 4 del Plan Modular de Desarrollo / Capa 2 / Ficha Tecnica #9).
+ *
+ * Rangos aritmeticos blindados en 16 bits (GDD Seccion F.1):
+ *   - fpX pertenece a [-2560, +2560] (+-160 unidades de mundo x 16).
+ *   - fpY pertenece a [-1440, +1440] (+-90 unidades de mundo x 16, +y hacia el suelo).
+ *   - z pertenece a [8, 100] unidades axiales.
+ *   - vx pertenece a [-160, +160] subunidades/tick.
+ *   - vy pertenece a [-240, +240] subunidades/tick.
+ *   - vz pertenece a [1, 16] unidades axiales/tick.
+ */
+class Projectile {
+
+    field boolean active;
+    field int fpX;
+    field int fpY;
+    field int z;
+    field int vx;
+    field int vy;
+    field int vz;
+    field int damage;
+    field int bounceCount;
+
+    /** Crea una ranura de proyectil inicialmente inactiva para el pool. */
+    constructor Projectile new() {
+        do deactivate();
+        return this;
+    }
+
+    /**
+     * Activa el proyectil convirtiendo coordenadas iniciales de mundo (startWorldX,
+     * startWorldY) a punto fijo Q11.4 (x16) y acotando velocidades y dano.
+     */
+    method void spawn(int startWorldX, int startWorldY, int startZ, int initVx, int initVy, int initVz, int dmg) {
+        var int maxWorldX;
+        var int maxWorldY;
+        var int safeWx;
+        var int safeWy;
+        var int maxV;
+
+        let maxWorldX = GameConstants.corridorMaxX();
+        let maxWorldY = GameConstants.corridorMaxY();
+        let safeWx = MathUtils.clamp(startWorldX, (-maxWorldX), maxWorldX);
+        let safeWy = MathUtils.clamp(startWorldY, (-maxWorldY), maxWorldY);
+        let maxV = GameConstants.maxVy();
+
+        let active = true;
+        let fpX = MathUtils.toFixed(safeWx);
+        let fpY = MathUtils.toFixed(safeWy);
+        let z = MathUtils.clamp(startZ, GameConstants.zNearClip(), GameConstants.zSpawn());
+        let vx = MathUtils.clamp(initVx, (-maxWorldX), maxWorldX);
+        let vy = MathUtils.clamp(initVy, (-maxV), maxV);
+        let vz = MathUtils.clamp(initVz, 1, 16);
+        let damage = MathUtils.clamp(dmg, 1, GameConstants.maxHealth());
+        let bounceCount = 0;
+        return;
+    }
+
+    /** Libera logicamente la ranura para su reutilizacion sin tocar el heap. */
+    method void deactivate() {
+        let active = false;
+        let fpX = 0;
+        let fpY = 0;
+        let z = GameConstants.zSpawn();
+        let vx = 0;
+        let vy = 0;
+        let vz = 0;
+        let damage = 0;
+        let bounceCount = 0;
+        return;
+    }
+
+    /** Retorna true si el proyectil esta en vuelo dentro del corredor. */
+    method boolean isActive() {
+        return active;
+    }
+
+    /** Coordenada horizontal en punto fijo Q11.4 [-2560, +2560]. */
+    method int getFpX() {
+        return fpX;
+    }
+
+    /** Coordenada vertical en punto fijo Q11.4 [-1440, +1440] (+y hacia abajo). */
+    method int getFpY() {
+        return fpY;
+    }
+
+    /** Coordenada horizontal entera en unidades de mundo [-160, +160] (fpX / 16). */
+    method int getWorldX() {
+        return MathUtils.fromFixed(fpX);
+    }
+
+    /** Coordenada vertical entera en unidades de mundo [-90, +90] (fpY / 16). */
+    method int getWorldY() {
+        return MathUtils.fromFixed(fpY);
+    }
+
+    /** Profundidad axial actual en [8, 100]. */
+    method int getZ() {
+        return z;
+    }
+
+    /** Velocidad horizontal en subunidades Q11.4 por tick [-160, +160]. */
+    method int getVx() {
+        return vx;
+    }
+
+    /** Velocidad vertical en subunidades Q11.4 por tick [-240, +240]. */
+    method int getVy() {
+        return vy;
+    }
+
+    /** Velocidad de aproximacion axial hacia el jugador en unidades por tick. */
+    method int getVz() {
+        return vz;
+    }
+
+    /** Dano que inflige al impactar contra el jugador. */
+    method int getDamage() {
+        return damage;
+    }
+
+    /** Numero acumulado de rebotes contra suelo, techo o paredes en este vuelo. */
+    method int getBounceCount() {
+        return bounceCount;
+    }
+
+    /**
+     * Actualiza el vector cinematico del proyectil tras un paso de integracion
+     * de PhysicsEngine (Contrato #3), garantizando todos los invariantes de 16 bits.
+     */
+    method void setKinematics(int newFpX, int newFpY, int newZ, int newVx, int newVy) {
+        var int maxFx;
+        var int maxVx;
+        var int maxV;
+
+        let maxFx = GameConstants.fpMaxX();
+        let maxVx = GameConstants.corridorMaxX();
+        let maxV = GameConstants.maxVy();
+
+        let fpX = MathUtils.clamp(newFpX, (-maxFx), maxFx);
+        let fpY = MathUtils.clamp(newFpY, GameConstants.fpCeilY(), GameConstants.fpFloorY());
+        let z = MathUtils.clamp(newZ, GameConstants.zNearClip(), GameConstants.zSpawn());
+        let vx = MathUtils.clamp(newVx, (-maxVx), maxVx);
+        let vy = MathUtils.clamp(newVy, (-maxV), maxV);
+        return;
+    }
+
+    /** Incrementa con saturacion segura el contador de rebotes fisicos registrados. */
+    method void registerBounce() {
+        if (bounceCount < 30000) {
+            let bounceCount = (bounceCount + 1);
+        }
+        return;
+    }
+
+    /** Libera las 9 palabras de memoria de esta instancia al cerrar el juego. */
+    method void dispose() {
+        do Memory.deAlloc(this);
+        return;
+    }
+}
+

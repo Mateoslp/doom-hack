@@ -1,0 +1,481 @@
+/**
+ * WorldRenderer.jack
+ * Subsistema de renderizado del escenario pseudo-3D movil y primitivas graficas
+ * blindadas con recorte matematico estricto al viewport [0..511] x [0..206]
+ * (Modulo 2 del Plan Modular de Desarrollo / Ficha Tecnica #13).
+ *
+ * Responsabilidades:
+ *   1. Mantener la fase de desplazamiento continuo del corredor (scrollPhase en [0..15]).
+ *   2. Dibujar techo, paredes laterales, suelo con guias longitudinales, portal central
+ *      y 4 anillos perspectivos 1/z en movimiento continuo sin tocar la banda del HUD
+ *      (filas 207..255).
+ *   3. Proveer drawSafeRect, drawSafeLine y drawSafeCircle inmunes a Sys.error(7..13)
+ *      y a desbordamientos intermedios de 16 bits.
+ *
+ * Cero asignaciones dinamicas en el bucle de renderizado.
+ */
+class WorldRenderer {
+
+    field int scrollPhase;
+
+    /** Inicializa el renderizador de mundo con fase de avance en 0. */
+    constructor WorldRenderer new() {
+        let scrollPhase = 0;
+        return this;
+    }
+
+    /** Restablece la fase de desplazamiento del corredor al inicio de partida. */
+    method void reset() {
+        let scrollPhase = 0;
+        return;
+    }
+
+    /**
+     * Avanza la fase ciclica del pasillo en [0, 15] usando aritmetica modular segura.
+     * Pre-reduce step modulo 16 para evitar overflow incluso ante entradas extremas.
+     */
+    method void advanceScroll(int step) {
+        var int safeStep;
+        let safeStep = MathUtils.mod(step, 16);
+        let scrollPhase = MathUtils.mod((scrollPhase + safeStep), 16);
+        return;
+    }
+
+    /** Retorna la fase actual del escenario en [0, 15]. */
+    method int getScrollPhase() {
+        return scrollPhase;
+    }
+
+    /**
+     * Renderiza un fotograma completo del corredor infernal pseudo-3D en el viewport
+     * [0..511] x [0..206], desplazando el punto de fuga horizontal segun vpX y
+     * proyectando 4 anillos de profundidad dinamicos segun scrollPhase.
+     */
+    method void renderCorridor(int vpX) {
+        var int maxX;
+        var int topY;
+        var int botY;
+        var int horizonY;
+        var int safeVpX;
+        var int portalLeft;
+        var int portalRight;
+        var int portalTop;
+        var int portalBot;
+        var int i;
+        var int zRing;
+        var int zEff;
+        var int t;
+        var int ringLeft;
+        var int ringRight;
+        var int ringTop;
+        var int ringBot;
+
+        let maxX = (GameConstants.screenWidth() - 1);
+        let topY = GameConstants.viewportTop();
+        let botY = GameConstants.viewportBottom();
+        let horizonY = GameConstants.baseHorizonY();
+
+        // Acotar vpX al rango geometrico de paralaje [216, 296] (256 +/- 40)
+        let safeVpX = MathUtils.clamp(vpX, 216, 296);
+
+        // 1. Limpieza exclusiva del viewport 3D (y: 0..206); jamas toca el HUD (207..255)
+        do Screen.setColor(false);
+        do WorldRenderer.drawSafeRect(0, topY, maxX, botY);
+        do Screen.setColor(true);
+
+        // 2. Coordenadas del portal de fondo en z = 100 (96 x 56 px centrado en safeVpX, 104)
+        let portalLeft = (safeVpX - 48);
+        let portalRight = (safeVpX + 48);
+        let portalTop = (horizonY - 28);
+        let portalBot = (horizonY + 28);
+
+        // Marco reforzado del portal abisal (interior blanco para contraste de siluetas)
+        do WorldRenderer.drawSafeLine(portalLeft, portalTop, portalRight, portalTop);
+        do WorldRenderer.drawSafeLine(portalLeft, portalBot, portalRight, portalBot);
+        do WorldRenderer.drawSafeLine(portalLeft, portalTop, portalLeft, portalBot);
+        do WorldRenderer.drawSafeLine(portalRight, portalTop, portalRight, portalBot);
+        do WorldRenderer.drawSafeLine((portalLeft - 2), (portalTop - 2), (portalRight + 2), (portalTop - 2));
+        do WorldRenderer.drawSafeLine((portalLeft - 2), (portalBot + 2), (portalRight + 2), (portalBot + 2));
+
+        // 3. Aristas principales convergentes (techo, paredes izquierda/derecha y suelo)
+        do WorldRenderer.drawSafeLine(0, topY, portalLeft, portalTop);
+        do WorldRenderer.drawSafeLine(maxX, topY, portalRight, portalTop);
+        do WorldRenderer.drawSafeLine(0, botY, portalLeft, portalBot);
+        do WorldRenderer.drawSafeLine(maxX, botY, portalRight, portalBot);
+
+        // Guias longitudinales centrales del suelo en perspectiva
+        do WorldRenderer.drawSafeLine((safeVpX - 16), portalBot, 176, botY);
+        do WorldRenderer.drawSafeLine((safeVpX + 16), portalBot, 336, botY);
+
+        // 4. Cuatro anillos perspectivos dinamicos con aceleracion no lineal 1/z
+        //    zRing = (i * 20) + (20 - scrollPhase) pertenece a [5, 80].
+        //    zEff = zRing + 7 pertenece a [12, 87], garantizando divisor >= 12 y
+        //    factor perspectivo t en [1, 88] sin overflow (max numerador 248 * 88 = 21824).
+        let i = 0;
+        while (i < 4) {
+            let zRing = ((i * 20) + (20 - scrollPhase));
+            let zEff = (zRing + 7);
+            let t = ((12 * (GameConstants.zSpawn() - zEff)) / zEff);
+            let t = MathUtils.clamp(t, 0, 100);
+
+            let ringLeft = (portalLeft - ((portalLeft * t) / 100));
+            let ringRight = (portalRight + (((maxX - portalRight) * t) / 100));
+            let ringTop = (portalTop - ((portalTop * t) / 100));
+            let ringBot = (portalBot + (((botY - portalBot) * t) / 100));
+
+            // Viga de techo, nervadura del suelo y pilares de paredes izquierda/derecha
+            do WorldRenderer.drawSafeLine(ringLeft, ringTop, ringRight, ringTop);
+            do WorldRenderer.drawSafeLine(ringLeft, ringBot, ringRight, ringBot);
+            do WorldRenderer.drawSafeLine(ringLeft, ringTop, ringLeft, ringBot);
+            do WorldRenderer.drawSafeLine(ringRight, ringTop, ringRight, ringBot);
+
+            let i = (i + 1);
+        }
+
+        return;
+    }
+
+    /**
+     * Dibuja un rectangulo recortado estrictamente al viewport [0..511] x [0..206].
+     * Ignora rectangulos invertidos (x1 > x2 o y1 > y2) o completamente exteriores
+     * al viewport sin producir trazos fantasma en los bordes ni errores ERR9.
+     */
+    function void drawSafeRect(int x1, int y1, int x2, int y2) {
+        var int minX;
+        var int maxX;
+        var int minY;
+        var int maxY;
+        var int cx1;
+        var int cy1;
+        var int cx2;
+        var int cy2;
+
+        if ((x1 > x2) | (y1 > y2)) {
+            return;
+        }
+
+        let minX = 0;
+        let maxX = (GameConstants.screenWidth() - 1);
+        let minY = GameConstants.viewportTop();
+        let maxY = GameConstants.viewportBottom();
+
+        if (((x2 < minX) | (x1 > maxX)) | ((y2 < minY) | (y1 > maxY))) {
+            return;
+        }
+
+        let cx1 = MathUtils.clamp(x1, minX, maxX);
+        let cy1 = MathUtils.clamp(y1, minY, maxY);
+        let cx2 = MathUtils.clamp(x2, minX, maxX);
+        let cy2 = MathUtils.clamp(y2, minY, maxY);
+
+        if ((cx1 > cx2) | (cy1 > cy2)) {
+            return;
+        }
+
+        do Screen.drawRectangle(cx1, cy1, cx2, cy2);
+        return;
+    }
+
+    /**
+     * Dibuja un segmento de linea recortado matematicamente al viewport [0..511] x [0..206]
+     * mediante algoritmo Cohen-Sutherland entero con escalado dinamico anti-overflow en 16 bits.
+     * Previene Sys.error(8) e impide invadir la region del HUD (y >= 207).
+     */
+    function void drawSafeLine(int x1, int y1, int x2, int y2) {
+        var int minX;
+        var int maxX;
+        var int minY;
+        var int maxY;
+        var int ax;
+        var int ay;
+        var int bx;
+        var int by;
+        var int c1;
+        var int c2;
+        var int cOut;
+        var int iter;
+        var boolean done;
+        var boolean accepted;
+        var boolean clipVerticalBound;
+        var int boundVal;
+        var int base;
+        var int delta;
+        var int step;
+        var int span;
+        var boolean neg;
+        var int absDelta;
+        var int absStep;
+        var int absSpan;
+        var int bit;
+        var int q;
+        var int rem;
+        var int offset;
+        var int interp;
+        var int newX;
+        var int newY;
+
+        let minX = 0;
+        let maxX = (GameConstants.screenWidth() - 1);
+        let minY = GameConstants.viewportTop();
+        let maxY = GameConstants.viewportBottom();
+
+        // Via rapida 1: Segmento horizontal
+        if (y1 = y2) {
+            if ((y1 < minY) | (y1 > maxY)) {
+                return;
+            }
+            if (((x1 < minX) & (x2 < minX)) | ((x1 > maxX) & (x2 > maxX))) {
+                return;
+            }
+            let ax = MathUtils.clamp(x1, minX, maxX);
+            let bx = MathUtils.clamp(x2, minX, maxX);
+            do Screen.drawLine(ax, y1, bx, y1);
+            return;
+        }
+
+        // Via rapida 2: Segmento vertical
+        if (x1 = x2) {
+            if ((x1 < minX) | (x1 > maxX)) {
+                return;
+            }
+            if (((y1 < minY) & (y2 < minY)) | ((y1 > maxY) & (y2 > maxY))) {
+                return;
+            }
+            let ay = MathUtils.clamp(y1, minY, maxY);
+            let by = MathUtils.clamp(y2, minY, maxY);
+            do Screen.drawLine(x1, ay, x1, by);
+            return;
+        }
+
+        // Evaluacion inicial de codigos de region (LEFT=1, RIGHT=2, TOP=4, BOTTOM=8)
+        let c1 = 0;
+        if (x1 < minX) { let c1 = (c1 | 1); }
+        if (x1 > maxX) { let c1 = (c1 | 2); }
+        if (y1 < minY) { let c1 = (c1 | 4); }
+        if (y1 > maxY) { let c1 = (c1 | 8); }
+
+        let c2 = 0;
+        if (x2 < minX) { let c2 = (c2 | 1); }
+        if (x2 > maxX) { let c2 = (c2 | 2); }
+        if (y2 < minY) { let c2 = (c2 | 4); }
+        if (y2 > maxY) { let c2 = (c2 | 8); }
+
+        // Aceptacion trivial inmediata (caso comun de trazos interiores)
+        if ((c1 | c2) = 0) {
+            do Screen.drawLine(x1, y1, x2, y2);
+            return;
+        }
+
+        // Rechazo trivial inmediato si ambos extremos comparten semiplano exterior
+        if (~((c1 & c2) = 0)) {
+            return;
+        }
+
+        // Acotar extremos a [-8191, 8191] para garantizar |bx - ax| <= 16382 (sin overflow en resta)
+        let ax = MathUtils.clamp(x1, -8191, 8191);
+        let ay = MathUtils.clamp(y1, -8191, 8191);
+        let bx = MathUtils.clamp(x2, -8191, 8191);
+        let by = MathUtils.clamp(y2, -8191, 8191);
+
+        let iter = 0;
+        let done = false;
+        let accepted = false;
+
+        while ((iter < 6) & (~done)) {
+            let c1 = 0;
+            if (ax < minX) { let c1 = (c1 | 1); }
+            if (ax > maxX) { let c1 = (c1 | 2); }
+            if (ay < minY) { let c1 = (c1 | 4); }
+            if (ay > maxY) { let c1 = (c1 | 8); }
+
+            let c2 = 0;
+            if (bx < minX) { let c2 = (c2 | 1); }
+            if (bx > maxX) { let c2 = (c2 | 2); }
+            if (by < minY) { let c2 = (c2 | 4); }
+            if (by > maxY) { let c2 = (c2 | 8); }
+
+            if ((c1 | c2) = 0) {
+                let accepted = true;
+                let done = true;
+            } else {
+                if (~((c1 & c2) = 0)) {
+                    let done = true;
+                } else {
+                    if (~(c1 = 0)) {
+                        let cOut = c1;
+                    } else {
+                        let cOut = c2;
+                    }
+
+                    if (~((cOut & 8) = 0)) {
+                        let clipVerticalBound = false;
+                        let boundVal = maxY;
+                        let base = ax;
+                        let delta = (bx - ax);
+                        let step = (maxY - ay);
+                        let span = (by - ay);
+                    } else {
+                        if (~((cOut & 4) = 0)) {
+                            let clipVerticalBound = false;
+                            let boundVal = minY;
+                            let base = ax;
+                            let delta = (bx - ax);
+                            let step = (minY - ay);
+                            let span = (by - ay);
+                        } else {
+                            if (~((cOut & 2) = 0)) {
+                                let clipVerticalBound = true;
+                                let boundVal = maxX;
+                                let base = ay;
+                                let delta = (by - ay);
+                                let step = (maxX - ax);
+                                let span = (bx - ax);
+                            } else {
+                                let clipVerticalBound = true;
+                                let boundVal = minX;
+                                let base = ay;
+                                let delta = (by - ay);
+                                let step = (minX - ax);
+                                let span = (bx - ax);
+                            }
+                        }
+                    }
+
+                    // Calculo exacto de base + ((delta * step) / span) sin superar jamas 32767.
+                    // Como boundVal separa los extremos, step y span tienen el mismo signo y 0 <= |step| <= |span| <= 16382.
+                    let neg = false;
+                    if (delta < 0) {
+                        let neg = true;
+                        let absDelta = (-delta);
+                    } else {
+                        let absDelta = delta;
+                    }
+                    let absStep = Math.abs(step);
+                    let absSpan = Math.abs(span);
+
+                    if ((absDelta = 0) | ((absStep = 0) | (~(absSpan > 0)))) {
+                        let offset = 0;
+                    } else {
+                        if (~(absDelta > (32767 / absStep))) {
+                            // Via directa exacta cuando el producto intermedio cabe en 15 bits
+                            let offset = ((absDelta * absStep) / absSpan);
+                        } else {
+                            // Division larga binaria exacta de 14 bits: calcula floor((absDelta * absStep) / absSpan)
+                            // sin desbordar 16 bits (rem < absSpan <= 16382 => 2*rem <= 32762 y rem+absStep <= 32763).
+                            let q = 0;
+                            let rem = 0;
+                            let bit = 8192;
+                            while (bit > 0) {
+                                let q = (q + q);
+                                let rem = (rem + rem);
+                                if (~(rem < absSpan)) {
+                                    let rem = (rem - absSpan);
+                                    let q = (q + 1);
+                                }
+                                if (~((absDelta & bit) = 0)) {
+                                    let rem = (rem + absStep);
+                                    if (~(rem < absSpan)) {
+                                        let rem = (rem - absSpan);
+                                        let q = (q + 1);
+                                    }
+                                }
+                                let bit = (bit / 2);
+                            }
+                            let offset = q;
+                        }
+                    }
+
+                    if (neg) {
+                        let interp = (base - offset);
+                    } else {
+                        let interp = (base + offset);
+                    }
+
+                    if (clipVerticalBound) {
+                        let newX = boundVal;
+                        let newY = interp;
+                    } else {
+                        let newX = interp;
+                        let newY = boundVal;
+                    }
+
+                    if (cOut = c1) {
+                        let ax = newX;
+                        let ay = newY;
+                    } else {
+                        let bx = newX;
+                        let by = newY;
+                    }
+                }
+            }
+
+            let iter = (iter + 1);
+        }
+
+        if (accepted) {
+            let ax = MathUtils.clamp(ax, minX, maxX);
+            let ay = MathUtils.clamp(ay, minY, maxY);
+            let bx = MathUtils.clamp(bx, minX, maxX);
+            let by = MathUtils.clamp(by, minY, maxY);
+            do Screen.drawLine(ax, ay, bx, by);
+        }
+        return;
+    }
+
+    /**
+     * Dibuja un circulo solido contenido estrictamente dentro de [0..511] x [0..206].
+     * Ignora radios negativos o centros fuera del viewport, y limita el radio maximo
+     * a la distancia al borde mas cercano (y <= 181) para impedir Sys.error(12) y Sys.error(13).
+     */
+    function void drawSafeCircle(int cx, int cy, int r) {
+        var int minX;
+        var int maxX;
+        var int minY;
+        var int maxY;
+        var int safeR;
+
+        if (r < 0) {
+            return;
+        }
+
+        let minX = 0;
+        let maxX = (GameConstants.screenWidth() - 1);
+        let minY = GameConstants.viewportTop();
+        let maxY = GameConstants.viewportBottom();
+
+        if (((cx < minX) | (cx > maxX)) | ((cy < minY) | (cy > maxY))) {
+            return;
+        }
+
+        let safeR = r;
+        if (safeR > 181) {
+            let safeR = 181;
+        }
+        if (safeR > (cx - minX)) {
+            let safeR = (cx - minX);
+        }
+        if (safeR > (maxX - cx)) {
+            let safeR = (maxX - cx);
+        }
+        if (safeR > (cy - minY)) {
+            let safeR = (cy - minY);
+        }
+        if (safeR > (maxY - cy)) {
+            let safeR = (maxY - cy);
+        }
+
+        if (safeR = 0) {
+            do Screen.drawPixel(cx, cy);
+            return;
+        }
+
+        do Screen.drawCircle(cx, cy, safeR);
+        return;
+    }
+
+    /** Libera la palabra de memoria de esta instancia. */
+    method void dispose() {
+        do Memory.deAlloc(this);
+        return;
+    }
+}

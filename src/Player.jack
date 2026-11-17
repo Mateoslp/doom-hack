@@ -1,0 +1,204 @@
+/**
+ * Player.jack
+ * Entidad singleton que encapsula el estado cinematico transversal, apuntado
+ * vertical, salud, cargador de municion y temporizadores de combate del jugador
+ * (Modulo 3 del Plan Modular de Desarrollo / Capa 2 / Ficha Tecnica #7).
+ *
+ * Invariantes garantizados:
+ *   - x pertenece a [-corridorMaxX, +corridorMaxX] = [-160, +160].
+ *   - aimY pertenece a [aimMinY, aimMaxY] = [72, 136] (dentro del viewport 0..206).
+ *   - health pertenece a [0, maxHealth] = [0, 100].
+ *   - ammo pertenece a [0, maxAmmo] = [0, 24].
+ *   - Temporizadores fireCooldown, flashTimer, recoilOffset, invulnTimer >= 0.
+ *
+ * Cero acoplamiento con Keyboard o Screen y cero asignaciones dinamicas tras new().
+ */
+class Player {
+
+    field int x;
+    field int aimY;
+    field int health;
+    field int ammo;
+    field int fireCooldown;
+    field int flashTimer;
+    field int recoilOffset;
+    field int invulnTimer;
+
+    /** Crea al jugador e inicializa todos sus atributos de partida. */
+    constructor Player new() {
+        do reset();
+        return this;
+    }
+
+    /** Restablece posicion, mira, salud, municion y temporizadores sin asignar memoria. */
+    method void reset() {
+        let x = 0;
+        let aimY = GameConstants.baseHorizonY();
+        let health = GameConstants.maxHealth();
+        let ammo = GameConstants.maxAmmo();
+        let fireCooldown = 0;
+        let flashTimer = 0;
+        let recoilOffset = 0;
+        let invulnTimer = 0;
+        return;
+    }
+
+    /**
+     * Avanza en 1 tick los temporizadores internos (invocado 1 vez por ciclo en PLAYING).
+     * recoilOffset decae a razon de 4 px/tick desde 8 hasta 0 conforme al GDD.
+     */
+    method void updateTimers() {
+        if (fireCooldown > 0) {
+            let fireCooldown = (fireCooldown - 1);
+        }
+        if (flashTimer > 0) {
+            let flashTimer = (flashTimer - 1);
+        }
+        if (recoilOffset > 0) {
+            if (recoilOffset > 4) {
+                let recoilOffset = (recoilOffset - 4);
+            } else {
+                let recoilOffset = 0;
+            }
+        }
+        if (invulnTimer > 0) {
+            let invulnTimer = (invulnTimer - 1);
+        }
+        return;
+    }
+
+    /** Desplaza al jugador hacia la izquierda acotando en -corridorMaxX (-160). */
+    method void moveLeft() {
+        var int maxC;
+        let maxC = GameConstants.corridorMaxX();
+        let x = MathUtils.clamp((x - GameConstants.playerSpeedX()), (-maxC), maxC);
+        return;
+    }
+
+    /** Desplaza al jugador hacia la derecha acotando en +corridorMaxX (+160). */
+    method void moveRight() {
+        var int maxC;
+        let maxC = GameConstants.corridorMaxX();
+        let x = MathUtils.clamp((x + GameConstants.playerSpeedX()), (-maxC), maxC);
+        return;
+    }
+
+    /** Eleva el punto de mira (disminuye aimY) acotando en aimMinY (72). */
+    method void aimUp() {
+        let aimY = MathUtils.clamp((aimY - GameConstants.playerAimSpeedY()), GameConstants.aimMinY(), GameConstants.aimMaxY());
+        return;
+    }
+
+    /** Baja el punto de mira (aumenta aimY) acotando en aimMaxY (136). */
+    method void aimDown() {
+        let aimY = MathUtils.clamp((aimY + GameConstants.playerAimSpeedY()), GameConstants.aimMinY(), GameConstants.aimMaxY());
+        return;
+    }
+
+    /**
+     * Intenta efectuar un disparo con el arma principal.
+     * Requiere jugador vivo, municion disponible (ammo > 0) y enfriamiento en 0.
+     * Retorna true si el disparo se efectuo (consumiendo 1 bala y activando flash/recoil).
+     */
+    method boolean tryFire() {
+        if (~(health > 0)) {
+            return false;
+        }
+        if (~(ammo > 0)) {
+            return false;
+        }
+        if (fireCooldown > 0) {
+            return false;
+        }
+
+        let ammo = (ammo - 1);
+        let fireCooldown = GameConstants.fireCooldownTicks();
+        let flashTimer = 2;
+        let recoilOffset = 8;
+        return true;
+    }
+
+    /**
+     * Recarga el cargador hasta maxAmmo (24) si el jugador esta vivo y el cargador no esta lleno.
+     * Retorna true unicamente si hubo cambio efectivo en ammo (para sincronizar HUD).
+     */
+    method boolean reload() {
+        var int maxA;
+        if (~(health > 0)) {
+            return false;
+        }
+        let maxA = GameConstants.maxAmmo();
+        if (~(ammo < maxA)) {
+            return false;
+        }
+        let ammo = maxA;
+        return true;
+    }
+
+    /**
+     * Aplica dano positivo al jugador respetando la ventana de invulnerabilidad (invulnTimer).
+     * Satura health en 0 sin subdesbordamiento y activa invulnTicks (8) tras recibir impacto.
+     * Retorna true si la salud cambio efectivamente.
+     */
+    method boolean takeDamage(int amount) {
+        if (~(amount > 0)) {
+            return false;
+        }
+        if (~(health > 0)) {
+            return false;
+        }
+        if (invulnTimer > 0) {
+            return false;
+        }
+
+        if (amount > health) {
+            let health = 0;
+        } else {
+            let health = (health - amount);
+        }
+        let invulnTimer = GameConstants.invulnTicks();
+        return true;
+    }
+
+    /** Retorna true mientras la salud del jugador sea estrictamente mayor que 0. */
+    method boolean isAlive() {
+        return (health > 0);
+    }
+
+    /** Retorna true durante los ticks de fogonazo activo tras disparar. */
+    method boolean isMuzzleFlashing() {
+        return (flashTimer > 0);
+    }
+
+    /** Coordenada horizontal del jugador en [-160, +160]. */
+    method int getX() {
+        return x;
+    }
+
+    /** Coordenada vertical de la mira en pantalla en [72, 136]. */
+    method int getAimY() {
+        return aimY;
+    }
+
+    /** Salud actual en [0, 100]. */
+    method int getHealth() {
+        return health;
+    }
+
+    /** Municion disponible en el cargador en [0, 24]. */
+    method int getAmmo() {
+        return ammo;
+    }
+
+    /** Desplazamiento vertical de retroceso del arma en [0, 8] px. */
+    method int getRecoilOffset() {
+        return recoilOffset;
+    }
+
+    /** Libera las 8 palabras de memoria de esta instancia. */
+    method void dispose() {
+        do Memory.deAlloc(this);
+        return;
+    }
+}
+

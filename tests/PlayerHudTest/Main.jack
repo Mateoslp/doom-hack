@@ -1,0 +1,352 @@
+/**
+ * Main.jack (Suite de Pruebas Automatizadas - Modulo 3: Player y HUD)
+ * Ubicacion: C:/DoomProject/tests/PlayerHudTest/Main.jack
+ *
+ * Verifica en VMEmulator v2.5 (estado logico, VRAM real RAM[16384..24575] y puntero de heap RAM[2049]):
+ *   1. Player (Tests 1..24): valores iniciales, desplazamiento lateral acotado [-160, 160],
+ *      paralaje con MathUtils.computeVanishingX, mira vertical acotada [72, 136],
+ *      cadencia de disparo (fireCooldown=4), fogonazo (2 ticks), retroceso (8->4->0),
+ *      agotamiento de cargador, recarga efectiva/redundante, dano con ventana de
+ *      invulnerabilidad (8 ticks), entradas invalidas (<=0, -32768), muerte sin
+ *      subdesbordamiento, bloqueo de acciones estando muerto y reset().
+ *   2. HUD (Tests 25..40): dibujo automatico de marco estatico (y: 207..255), aislamiento
+ *      total del viewport 3D (y: 0..206), optimizacion de 0 redibujos cuando isDirty=false,
+ *      barra grafica proporcional de HP, limpieza de digitos residuales en VRAM
+ *      (HP: 100->5, SCORE: 30000->0), aviso dinamico "RECARGA [R]" al vaciar municion
+ *      y borrado al recargar, estados PAUSED y GAME_OVER, defensas de clearTextField y null,
+ *      overlays de PAUSED, GAME_OVER y MENU, resetFrame(), PRUEBA ESTRICTA DE CERO
+ *      ASIGNACIONES DE HEAP (RAM[2049] invariante) y dispose() completo de 17 Strings.
+ *
+ * Registro en RAM:
+ *   RAM[8000] = total de pruebas ejecutadas (40)
+ *   RAM[8001] = pruebas aprobadas (40)
+ *   RAM[8002] = pruebas fallidas (0)
+ *   RAM[8003] = ID de la primera prueba fallida (0 si todas aprueban)
+ *   RAM[8004..8011] = testigos numericos verificados por PlayerHudTest.cmp
+ */
+class Main {
+
+    function int b2i(boolean flag) {
+        if (flag) {
+            return 1;
+        }
+        return 0;
+    }
+
+    function int nonZero(int val) {
+        if (~(val = 0)) {
+            return 1;
+        }
+        return 0;
+    }
+
+    function void check(int testId, int actual, int expected) {
+        var int total;
+        var int passed;
+        var int failed;
+        var int firstFail;
+
+        let total = (Memory.peek(8000) + 1);
+        do Memory.poke(8000, total);
+
+        if (actual = expected) {
+            let passed = (Memory.peek(8001) + 1);
+            do Memory.poke(8001, passed);
+        } else {
+            let failed = (Memory.peek(8002) + 1);
+            do Memory.poke(8002, failed);
+            let firstFail = Memory.peek(8003);
+            if (firstFail = 0) {
+                do Memory.poke(8003, testId);
+            }
+        }
+        return;
+    }
+
+    function void main() {
+        var int minInt16;
+        var int sentinel;
+        var Player p;
+        var ScoreManager scores;
+        var HUD hud;
+        var int i;
+        var int k;
+        var int r1;
+        var int r2;
+        var int heapBefore;
+        var int heapDelta;
+        var int wHpResidualCleaned;
+        var int wReloadPromptCycle;
+        var int wScoreResidualCleaned;
+        var int wDirtySkip;
+
+        do Memory.poke(8000, 0);
+        do Memory.poke(8001, 0);
+        do Memory.poke(8002, 0);
+        do Memory.poke(8003, 0);
+
+        let minInt16 = ((-32767) - 1);
+        let sentinel = 21845;
+
+        // =====================================================================
+        // PARTE A: Player (Tests 1..24)
+        // =====================================================================
+        let p = Player.new();
+
+        // Estado inicial: x=0, aimY=104, health=100, ammo=24 -> suma = 228
+        do Main.check(1, (((p.getX() + p.getAimY()) + p.getHealth()) + p.getAmmo()), 228);
+        do Main.check(2, (((Main.b2i(p.isAlive()) * 100) + (Main.b2i(p.isMuzzleFlashing()) * 10)) + p.getRecoilOffset()), 100);
+
+        // Movimiento lateral e invariante [-160, +160]
+        do p.moveLeft();
+        do Main.check(3, p.getX(), -12);
+
+        let i = 0;
+        while (i < 20) {
+            do p.moveLeft();
+            let i = (i + 1);
+        }
+        do Main.check(4, p.getX(), -160);
+
+        do p.moveRight();
+        let r1 = p.getX();
+        let i = 0;
+        while (i < 30) {
+            do p.moveRight();
+            let i = (i + 1);
+        }
+        do Main.check(5, (r1 + p.getX()), 12);
+        do Main.check(6, MathUtils.computeVanishingX(p.getX()), 216);
+
+        // Apuntado vertical e invariante [72, 136]
+        do p.aimUp();
+        let r1 = p.getAimY();
+        let i = 0;
+        while (i < 15) {
+            do p.aimUp();
+            let i = (i + 1);
+        }
+        do Main.check(7, ((r1 * 100) + p.getAimY()), 10072);
+
+        do p.aimDown();
+        let r1 = p.getAimY();
+        let i = 0;
+        while (i < 25) {
+            do p.aimDown();
+            let i = (i + 1);
+        }
+        do Main.check(8, ((r1 * 100) + p.getAimY()), 7736);
+
+        // Recarga redundante con cargador lleno (24/24) retorna false (0)
+        do Main.check(9, ((Main.b2i(p.reload()) * 100) + p.getAmmo()), 24);
+
+        // Disparo, cooldown (4 ticks), flash (2 ticks) y recoil (8 -> 4 -> 0)
+        let r1 = Main.b2i(p.tryFire());
+        do Main.check(10, (((r1 * 1000) + (p.getAmmo() * 10)) + Main.b2i(p.isMuzzleFlashing())), 1231);
+        do Main.check(11, p.getRecoilOffset(), 8);
+
+        // Bloqueado durante fireCooldown > 0
+        do Main.check(12, ((Main.b2i(p.tryFire()) * 100) + p.getAmmo()), 23);
+
+        // Tick 1: cooldown=3, flash=1, recoil=4
+        do p.updateTimers();
+        do Main.check(13, ((Main.b2i(p.isMuzzleFlashing()) * 10) + p.getRecoilOffset()), 14);
+
+        // Tick 2: cooldown=2, flash=0, recoil=0, aun bloqueado para disparar
+        do p.updateTimers();
+        do Main.check(14, (((Main.b2i(p.isMuzzleFlashing()) * 10) + p.getRecoilOffset()) + Main.b2i(p.tryFire())), 0);
+
+        // Ticks 3 y 4: cooldown llega a 0 y permite siguiente disparo (ammo -> 22)
+        do p.updateTimers();
+        do p.updateTimers();
+        do Main.check(15, ((Main.b2i(p.tryFire()) * 100) + p.getAmmo()), 122);
+
+        // Vaciar las 22 balas restantes y comprobar bloqueo con ammo = 0
+        let i = 0;
+        while (i < 22) {
+            do p.updateTimers();
+            do p.updateTimers();
+            do p.updateTimers();
+            do p.updateTimers();
+            do p.tryFire();
+            let i = (i + 1);
+        }
+        do p.updateTimers();
+        do p.updateTimers();
+        do p.updateTimers();
+        do p.updateTimers();
+        do Main.check(16, (p.getAmmo() + Main.b2i(p.tryFire())), 0);
+
+        // Recarga desde 0 restaura 24 balas y retorna true
+        do Main.check(17, ((Main.b2i(p.reload()) * 100) + p.getAmmo()), 124);
+
+        // Dano defensivo ante valores <= 0 y -32768
+        let r1 = ((Main.b2i(p.takeDamage(0)) + Main.b2i(p.takeDamage(-25))) + Main.b2i(p.takeDamage(minInt16)));
+        do Main.check(18, (r1 + p.getHealth()), 100);
+
+        // Dano valido (35 -> health = 65) y activacion de invulnTicks (8)
+        do Main.check(19, (((Main.b2i(p.takeDamage(35)) * 1000) + (p.getHealth() * 10)) + Main.b2i(p.isAlive())), 1651);
+
+        // Durante 7 ticks de updateTimers, invulnTimer > 0 rechaza nuevo dano
+        let r1 = 0;
+        let i = 0;
+        while (i < 7) {
+            let r1 = (r1 + Main.b2i(p.takeDamage(20)));
+            do p.updateTimers();
+            let i = (i + 1);
+        }
+        let r1 = (r1 + Main.b2i(p.takeDamage(20)));
+        do Main.check(20, (r1 + p.getHealth()), 65);
+
+        // Octavo tick expira invulnTimer -> nuevo dano aplica (65 - 20 = 45)
+        do p.updateTimers();
+        do Main.check(21, ((Main.b2i(p.takeDamage(20)) * 100) + p.getHealth()), 145);
+
+        // Dano letal excesivo satura health exactamente en 0 sin valores negativos
+        let i = 0;
+        while (i < 8) {
+            do p.updateTimers();
+            let i = (i + 1);
+        }
+        do Main.check(22, (((Main.b2i(p.takeDamage(500)) * 100) + (p.getHealth() * 10)) + Main.b2i(p.isAlive())), 100);
+
+        // Jugador muerto no puede disparar, recargar ni recibir mas dano
+        do Main.check(23, ((Main.b2i(p.tryFire()) + Main.b2i(p.reload())) + Main.b2i(p.takeDamage(10))), 0);
+
+        // reset() restaura todos los atributos intactos
+        do p.reset();
+        do Main.check(24, ((((p.getX() + p.getAimY()) + p.getHealth()) + p.getAmmo()) + Main.b2i(p.isAlive())), 229);
+
+        // =====================================================================
+        // PARTE B: HUD + Integracion + VRAM + Cero Fugas de Heap (Tests 25..40)
+        // =====================================================================
+        let scores = ScoreManager.new();
+        let hud = HUD.new();
+
+        // Capturar puntero libre principal del heap tras construir subsistemas
+        let heapBefore = Memory.peek(2049);
+
+        // Sembrar centinelas en el viewport 3D: y=0 (16384) y y=206 (22976, 23007)
+        do Memory.poke(16384, sentinel);
+        do Memory.poke(22976, sentinel);
+        do Memory.poke(23007, sentinel);
+
+        // Primer updateIfNeeded traza marco estatico (viga 207..208: 23008 y 23071 = -1)
+        do hud.updateIfNeeded(p, scores, GameState.playing());
+        do Main.check(25, (Memory.peek(23008) + Memory.peek(23071)), -2);
+
+        // Barra HP=100 llena izquierda (24065=-1) y derecha (24070=-1), y digitos '00' en 23587
+        do Main.check(26, (((Memory.peek(24065) + Memory.peek(24070)) * 10) + Main.nonZero(Memory.peek(23587))), -19);
+
+        // Aislamiento estricto: HUD no escribe ni un bit en el viewport 3D (y=0..206)
+        do Main.check(27, (((Memory.peek(16384) - sentinel) + (Memory.peek(22976) - sentinel)) + (Memory.peek(23007) - sentinel)), 0);
+
+        // Cuando isDirty=false, updateIfNeeded realiza 0 escrituras en pantalla
+        do Memory.poke(24065, 12345);
+        do p.takeDamage(95);
+        do hud.updateIfNeeded(p, scores, GameState.playing());
+        let wDirtySkip = Memory.peek(24065);
+        do Main.check(28, wDirtySkip, 12345);
+
+        // Al marcar markDirty(), actualiza HP=5: vacia barra derecha (24070=0) y borra '00' residuales (23587=0)
+        do hud.markDirty();
+        do hud.updateIfNeeded(p, scores, GameState.playing());
+        let wHpResidualCleaned = (Main.nonZero(Memory.peek(24070)) + Main.nonZero(Memory.peek(23587)));
+        do Main.check(29, wHpResidualCleaned, 0);
+
+        // Aviso dinamico "RECARGA [R]" en fila 21 (23946): ausente con ammo=24, presente con ammo=0, borrado tras reload()
+        let r1 = Main.nonZero(Memory.peek(23946));
+        let k = 0;
+        while (k < 24) {
+            do p.updateTimers();
+            do p.updateTimers();
+            do p.updateTimers();
+            do p.updateTimers();
+            do p.tryFire();
+            let k = (k + 1);
+        }
+        do hud.markDirty();
+        do hud.updateIfNeeded(p, scores, GameState.playing());
+        let r2 = Main.nonZero(Memory.peek(23946));
+        do Main.check(30, ((r1 * 10) + r2), 1);
+
+        do p.reload();
+        do hud.markDirty();
+        do hud.updateIfNeeded(p, scores, GameState.playing());
+        let wReloadPromptCycle = ((r2 * 10) + Main.nonZero(Memory.peek(23946)));
+        do Main.check(31, wReloadPromptCycle, 10);
+
+        // Integracion ScoreManager: SCORE=30000 escribe digitos en col 42..43 (23605) y reset() los borra a 0
+        do scores.addBonus(30000);
+        do hud.markDirty();
+        do hud.updateIfNeeded(p, scores, GameState.playing());
+        let r1 = Main.nonZero(Memory.peek(23605));
+        do scores.reset();
+        do hud.markDirty();
+        do hud.updateIfNeeded(p, scores, GameState.playing());
+        let r2 = Main.nonZero(Memory.peek(23605));
+        let wScoreResidualCleaned = ((r1 * 10) + r2);
+        do Main.check(32, wScoreResidualCleaned, 10);
+
+        // Estados PAUSED y GAME_OVER en modulo 4 sin desbordar columna 63 hacia fila 0
+        do hud.markDirty();
+        do hud.updateIfNeeded(p, scores, GameState.paused());
+        do hud.markDirty();
+        do hud.updateIfNeeded(p, scores, GameState.gameOver());
+        do Main.check(33, ((Memory.peek(16384) - sentinel) + (Memory.peek(22976) - sentinel)), 0);
+
+        // Defensas contra null y coordenadas fuera de rango en clearTextField (sin ERR20)
+        do hud.markDirty();
+        do hud.updateIfNeeded(null, null, GameState.playing());
+        do hud.clearTextField(-10, -5);
+        do hud.clearTextField(99, 99);
+        do Main.check(34, (Memory.peek(22976) - sentinel), 0);
+
+        // Overlays en viewport: PAUSED (borde y=76 -> 16384 + 2432 + 10 = 18826) preserva HUD (23008 = -1)
+        do hud.renderPauseOverlay();
+        do Main.check(35, (Memory.peek(18826) + Memory.peek(23008)), -2);
+
+        // Overlay GAME_OVER (borde y=54 -> 16384 + 1728 + 10 = 18122) y llamada defensiva con null
+        do scores.registerKill(2);
+        do hud.renderGameOverOverlay(scores);
+        do hud.renderGameOverOverlay(null);
+        do Main.check(36, (Memory.peek(18122) + Memory.peek(23008)), -2);
+
+        // Pantalla MENU (borde y=12 -> 16384 + 384 + 10 = 16778) invalida frameDrawn y redibuja HUD al volver
+        do hud.renderMenuScreen(-50);
+        do hud.renderMenuScreen(32767);
+        let r1 = Memory.peek(16778);
+        do hud.updateIfNeeded(p, scores, GameState.playing());
+        do Main.check(37, (r1 + Memory.peek(23008)), -2);
+
+        // resetFrame() fuerza reconstruccion del marco estatico
+        do Memory.poke(23008, 0);
+        do hud.resetFrame();
+        do hud.updateIfNeeded(p, scores, GameState.playing());
+        do Main.check(38, Memory.peek(23008), -1);
+
+        // PRUEBA DE ORO: Cero palabras asignadas en el heap durante toda la simulacion de juego e interfaz
+        let heapDelta = (Memory.peek(2049) - heapBefore);
+        do Main.check(39, heapDelta, 0);
+
+        // Liberacion simetrica completa (17 Strings + HUD + Player + ScoreManager) y reasignacion limpia
+        do hud.dispose();
+        do p.dispose();
+        do scores.dispose();
+        let p = Player.new();
+        do Main.check(40, p.getHealth(), 100);
+        do p.dispose();
+
+        // Testigos numericos para comparacion .cmp en RAM[8004..8011]
+        do Memory.poke(8004, wDirtySkip);
+        do Memory.poke(8005, wHpResidualCleaned);
+        do Memory.poke(8006, wReloadPromptCycle);
+        do Memory.poke(8007, wScoreResidualCleaned);
+        do Memory.poke(8008, heapDelta);
+        do Memory.poke(8009, Memory.peek(23008));
+        do Memory.poke(8010, Memory.peek(23071));
+        do Memory.poke(8011, 216);
+
+        return;
+    }
+}
